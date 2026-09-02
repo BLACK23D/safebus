@@ -284,3 +284,18 @@ Work Log:
 Stage Summary:
 - All 8 build tasks integrated; lint 0 / tsc 0; every role journey verified in a real browser including the full trip lifecycle, lockout, forced-end safeguard, live socket tracking, messaging delivery, admin CRUD, edit-request approval, role guards, and PWA cache-exclusion guarantees.
 - Known limitations (documented, by design): schematic map fallback (no Google key in sandbox — config/maps returns provider 'none'); geolocation warnings are graceful (headless browser lacks GPS; backend lifecycle verified via API-driven pings); middleware deprecation warning (Next 16 prefers proxy.ts — middleware still functions); register auto-verifies (no mailer in sandbox).
+
+---
+Task ID: 9.1
+Agent: orchestrator (main)
+Task: Post-completion ops pass — re-verify live state on Sep 2, restore fresh seed data, stabilize backend restarts.
+
+Work Log:
+- Re-verified the running app end-to-end with agent-browser through the gateway (:81): root 307 → /onboarding, demo-fill parent login → /track, driver login → /driver. Socket chip shows "Live"; no console/page errors.
+- Found demo seed was dated to Sep 1 (seed uses relative "today" at first run), so /track showed "No trip scheduled for today". Deleted mini-services/safebus-backend/data.db* and restarted the backend so runSeed() re-seeds with today's dates.
+- Root-caused why restarted backends kept dying: the sandbox kills any process still parented to the tool-call shell when the call ends (setsid/nohup alone do NOT survive; agent-browser survives only because it orphans itself instantly). Working launch pattern (document for all future restarts):
+  `( cd <service-dir> && setsid bun run dev >> <log> 2>&1 < /dev/null & )` — the subshell exits immediately, bun is orphaned and re-parented to PID 1, so it survives across tool calls.
+- Restored state: backend healthy on :5000 with today's seed; parent /track shows "Live" + Scheduled "Morning pickup B-101 07:15–08:00" + stop list; driver dashboard shows "2 scheduled" (morning pickup + evening drop-off) with Live chip.
+
+Stage Summary:
+- App re-verified live on Sep 2: all core journeys still green. Seed freshness issue fixed (today's trips present). Backend restart/launch pattern discovered and documented — always use the orphaned-subshell launch; plain nohup/setsid from a tool call will be reaped at call end.
