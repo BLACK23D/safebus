@@ -68,6 +68,13 @@ type Emergency = {
 
 type EmergencyContact = { name: string; role: string; phone: string };
 
+/** Envelope-tolerant list unwrap (contract §0) — same helper the profile page uses. */
+function listOf<T>(d: unknown): T[] {
+  if (Array.isArray(d)) return d as T[];
+  const j = d as { items?: T[]; results?: T[] } | null;
+  return j?.items ?? j?.results ?? [];
+}
+
 const TYPE_META: Record<EmergencyType, { label: string; icon: typeof Siren }> = {
   medical: { label: 'Medical', icon: HeartPulse },
   accident: { label: 'Accident', icon: CarFront },
@@ -299,7 +306,7 @@ export function EmergencyPage({ session }: { session: AppSession }) {
                 <p className="text-xs capitalize text-muted-foreground">{c.role}</p>
                 <a
                   href={`tel:${c.phone}`}
-                  className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-lg px-1 text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+                  className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
                 >
                   <Phone className="h-4 w-4" /> {c.phone}
                 </a>
@@ -339,14 +346,14 @@ function ResolveDialog({
       <Button
         variant={resolve ? 'default' : 'outline'}
         onClick={() => setOpen(true)}
-        className={cn('min-h-10 flex-1', resolve && 'bg-emerald-600 hover:bg-emerald-700')}
+        className={cn('min-h-10 flex-1', resolve ? 'bg-emerald-700 hover:bg-emerald-800' : undefined)}
       >
-        <CheckCircle2 className="h-4 w-4" /> {resolve ? 'Resolve' : 'Cancel'}
+        <CheckCircle2 className="h-4 w-4" /> {resolve ? 'Resolve' : 'Cancel alert'}
       </Button>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {resolve ? 'Resolve this emergency?' : 'Cancel this emergency alert?'}
+            {resolve ? 'Resolve this emergency alert?' : 'Cancel this emergency alert?'}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {resolve
@@ -357,7 +364,7 @@ function ResolveDialog({
         <AlertDialogFooter>
           <AlertDialogCancel className="min-h-10">Keep open</AlertDialogCancel>
           <AlertDialogAction
-            className={cn('min-h-10', resolve ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-600 hover:bg-slate-700')}
+            className={cn('min-h-10', resolve ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-slate-600 hover:bg-slate-700')}
             disabled={busy}
             onClick={async (ev) => {
               ev.preventDefault();
@@ -396,8 +403,8 @@ function ReportDialog({
     if (!open) return;
     let alive = true;
     http
-      .get<{ id: string; name: string; grade?: string }[]>('/students', { parent: 'me' })
-      .then((rows) => alive && setChildren(rows))
+      .get<unknown>('/students', { parent: 'me' })
+      .then((rows) => alive && setChildren(listOf<{ id: string; name: string; grade?: string }>(rows)))
       .catch(() => alive && setChildren([]));
     return () => {
       alive = false;

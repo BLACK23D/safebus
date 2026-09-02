@@ -54,8 +54,25 @@ export const TRIP_TYPE_LABEL: Record<TripType, string> = {
   dropoff: 'Evening drop-off',
 };
 
+/** Short labels used in chips/badges/selects (QA #4 — one map, no "Dropoff" drift). */
+export const TRIP_TYPE_SHORT: Record<TripType, string> = {
+  pickup: 'Pickup',
+  dropoff: 'Drop-off',
+};
+
+/**
+ * Deterministic 24h clock time (HH:mm) — QA M9. Locale-dependent
+ * `toLocaleTimeString` rendered 12h output in some browsers while parent
+ * surfaces use 24h; everything now flows through this one formatter.
+ */
 export function formatTime(iso?: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (Number.isNaN(d.getTime())) return '—';
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+export function formatTimeRange(start?: string | null, end?: string | null): string {
+  return `${formatTime(start)} – ${formatTime(end)}`;
 }

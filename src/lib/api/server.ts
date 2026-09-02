@@ -47,7 +47,11 @@ export async function serverApi<T>(path: string, q?: Record<string, unknown>): P
     | { success?: boolean; data?: unknown; message?: string; error?: { message?: string } }
     | null;
   if (!res.ok) {
-    throw new ServerFetchError(json?.error?.message ?? json?.message ?? `Upstream ${res.status}`);
+    throw new ServerFetchError(
+      json?.error?.message ??
+        json?.message ??
+        'The server is having trouble right now — please try again in a minute.',
+    );
   }
   return (json && 'data' in json ? json.data : json) as T;
 }

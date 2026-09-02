@@ -57,7 +57,7 @@ export function RegisterForm() {
   return (
     <AuthShell
       title="Create your account"
-      subtitle="Parents: sign up to follow your student's ride"
+      subtitle="Parents: sign up to follow your child's ride"
     >
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         <Field

@@ -24,7 +24,7 @@ type BusRow = Row & { number?: string };
 
 const fields: FieldDef<StudentRow>[] = [
   { key: 'name', label: 'Name', type: 'text', required: true },
-  { key: 'grade', label: 'Grade', type: 'text', placeholder: 'e.g. g3' },
+  { key: 'grade', label: 'Grade', type: 'text', placeholder: 'e.g. 3', hint: 'Single number' },
   { key: 'studentCode', label: 'Student code', type: 'text' },
   { key: 'parentId', label: 'Parent', type: 'ref', refPath: '/users?role=parent' },
   { key: 'busId', label: 'Bus', type: 'ref', refPath: '/buses', labelKey: 'number' },

@@ -400,7 +400,8 @@ function SchematicMap({
               strokeWidth={6}
               strokeLinecap="round"
               strokeLinejoin="round"
-              opacity={0.45}
+              /* Route line keeps ≥3:1 against the dark map paper (QA #22). */
+              className="opacity-45 dark:opacity-70"
             />
           )}
           {points.map((p) => {
@@ -418,7 +419,7 @@ function SchematicMap({
                   cx={p.x}
                   cy={p.y}
                   r={16}
-                  fill={arrived ? '#10b981' : '#1976d2'}
+                  fill={arrived ? '#047857' : '#1976d2'}
                   stroke="#ffffff"
                   strokeWidth={3}
                 />

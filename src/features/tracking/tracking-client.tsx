@@ -29,7 +29,13 @@ import {
 
 import { http } from '@/lib/api/client';
 import { SE } from '@/lib/socket/events';
-import { useJoinTrip, useSocketEvent, useSocketStatus } from '@/components/providers/socket-provider';
+import {
+  useJoinTrip,
+  useSocketEvent,
+  useSocketStatus,
+  socketStatusLabel,
+  useOnline,
+} from '@/components/providers/socket-provider';
 import { LiveMap, type BusPosition } from '@/components/map/live-map';
 import { EmptyState, ErrorState, PageHeader, PageSkeleton, StatusBadge } from '@/components/ui/kit';
 import { Badge } from '@/components/ui/badge';
@@ -125,6 +131,7 @@ export function TrackingClient({
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const live = useSocketStatus();
+  const online = useOnline();
   const child = useMemo(() => kids.find((k) => k.id === selectedId) ?? kids[0] ?? null, [kids, selectedId]);
 
   // Fetch the selected child's route (ordered stops) + today's trip touching that route.
@@ -224,7 +231,7 @@ export function TrackingClient({
       const key = `${trip.id}:${p.stopId}:${p.minutes}`;
       if (!etaToastKeys.current.has(key)) {
         etaToastKeys.current.add(key);
-        toast.info(`Bus is ${p.minutes} minutes away — ${p.stopName ?? 'your stop'}`);
+        toast.info(`Bus is ${p.minutes} minute${p.minutes === 1 ? '' : 's'} away — ${p.stopName ?? 'your stop'}`);
       }
     },
     [trip],
@@ -338,12 +345,12 @@ export function TrackingClient({
     <span
       className={cn(
         'inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-semibold',
-        live ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400',
+        live ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400',
       )}
       title={live ? 'Live — connected' : 'Reconnecting — live updates paused'}
     >
-      <span aria-hidden className={cn('status-light', live ? 'text-emerald-500' : 'text-amber-500')} />
-      {live ? 'Live' : 'Reconnecting…'}
+      <span aria-hidden className={cn('status-light', live ? 'text-emerald-600' : 'text-amber-600')} />
+      {socketStatusLabel(live, online)}
     </span>
   );
 
@@ -423,7 +430,7 @@ export function TrackingClient({
                   'grid h-11 w-11 shrink-0 place-items-center rounded-xl',
                   trip?.type === 'dropoff'
                     ? 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400'
-                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+                    : 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
                 )}
               >
                 {trip?.type === 'dropoff' ? <Sunset className="h-5 w-5" /> : <Sunrise className="h-5 w-5" />}
@@ -527,7 +534,7 @@ export function TrackingClient({
                             className={cn(
                               'relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full border text-xs font-bold tabular-nums',
                               at
-                                ? 'border-transparent bg-emerald-500 text-white'
+                                ? 'border-transparent bg-emerald-600 text-white'
                                 : isNext
                                   ? 'border-brand-500 bg-card text-brand-600 motion-safe:animate-pulse dark:text-brand-400'
                                   : 'border-border bg-card text-muted-foreground',
@@ -541,7 +548,7 @@ export function TrackingClient({
                             {isMine && <Badge variant="secondary">Your stop</Badge>}
                             <span className="flex-1" aria-hidden />
                             {at && (
-                              <span className="inline-flex items-center gap-1 text-xs tabular-nums text-emerald-600 dark:text-emerald-400">
+                              <span className="inline-flex items-center gap-1 text-xs tabular-nums text-emerald-700 dark:text-emerald-400">
                                 <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
                                 {hm(at)}
                               </span>
@@ -549,7 +556,7 @@ export function TrackingClient({
                             {isNext && (
                               <Badge
                                 variant="outline"
-                                className="motion-safe:animate-pulse border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                                className="motion-safe:animate-pulse border-amber-500/40 bg-amber-500/15 text-amber-800 dark:text-amber-300"
                               >
                                 Next
                               </Badge>

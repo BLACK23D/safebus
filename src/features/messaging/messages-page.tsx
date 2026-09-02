@@ -125,7 +125,7 @@ export function MessagesPage({ session }: { session: AppSession }) {
                     <StatusBadge status={c.role} className="hidden sm:inline-flex" />
                     {c.unread > 0 && (
                       <span
-                        className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white tabular-nums"
+                        className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-rose-600 px-1.5 text-[10px] font-bold text-white tabular-nums"
                         aria-label={`${c.unread} unread`}
                       >
                         {c.unread > 9 ? '9+' : c.unread}

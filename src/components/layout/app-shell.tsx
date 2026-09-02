@@ -20,8 +20,24 @@ import { ROLE_LABEL, ROLE_HOME } from '@/lib/auth/access';
 import type { AppSession } from '@/lib/auth/session';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { http } from '@/lib/api/client';
-import { SE, useSocket, useSocketEvent, useSocketStatus } from '@/components/providers/socket-provider';
+import {
+  SE,
+  useSocket,
+  useSocketEvent,
+  useSocketStatus,
+  socketStatusLabel,
+  useOnline,
+} from '@/components/providers/socket-provider';
+import { ScrollLockCleanup } from '@/components/layout/scroll-lock-cleanup';
 import { toast } from 'sonner';
 
 /**
@@ -33,20 +49,8 @@ export function AppShell({ session, children }: { session: AppSession; children:
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { connected } = useSocket();
-  const [online, setOnline] = useState(true);
+  const online = useOnline();
   const [unread, setUnread] = useState(0);
-  const [userMenu, setUserMenu] = useState(false);
-
-  useEffect(() => {
-    const sync = () => setOnline(navigator.onLine);
-    sync();
-    addEventListener('online', sync);
-    addEventListener('offline', sync);
-    return () => {
-      removeEventListener('online', sync);
-      removeEventListener('offline', sync);
-    };
-  }, []);
 
   // Unread notifications: reset when viewing the page, +1 per live event.
   useEffect(() => {
@@ -97,6 +101,7 @@ export function AppShell({ session, children }: { session: AppSession; children:
 
   return (
     <div className="min-h-dvh bg-background">
+      <ScrollLockCleanup />
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-brand-500 focus:px-4 focus:py-2 focus:text-white"
@@ -136,7 +141,7 @@ export function AppShell({ session, children }: { session: AppSession; children:
                       <item.icon className="h-[18px] w-[18px] shrink-0" />
                       <span className="flex-1 truncate">{item.label}</span>
                       {item.href === '/notifications' && unread > 0 && (
-                        <span className="rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white tabular-nums">
+                        <span className="rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold text-white tabular-nums">
                           {unread > 99 ? '99+' : unread}
                         </span>
                       )}
@@ -168,7 +173,7 @@ export function AppShell({ session, children }: { session: AppSession; children:
               <Moon className="hidden h-4 w-4 dark:block" />
               Theme
             </Button>
-            <Button variant="ghost" size="sm" onClick={logout} aria-label="Log out">
+            <Button variant="ghost" size="sm" onClick={logout} aria-label="Sign out">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
@@ -189,63 +194,57 @@ export function AppShell({ session, children }: { session: AppSession; children:
         <span
           className={cn(
             'inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-semibold',
-            online && connected ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400',
+            online && connected ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400',
           )}
           title={online && connected ? 'Live — connected' : 'Reconnecting — live updates paused'}
         >
-          <span className={cn('status-light', online && connected ? 'text-emerald-500' : 'text-amber-500')} />
-          {online && connected ? 'Live' : online ? 'Connecting' : 'Offline'}
+          <span className={cn('status-light', online && connected ? 'text-emerald-600' : 'text-amber-600')} />
+          {socketStatusLabel(connected, online)}
         </span>
         <Link
           href="/notifications"
-          className="relative grid h-10 w-10 place-items-center rounded-xl hover:bg-accent"
+          className="relative grid h-11 w-11 place-items-center rounded-xl hover:bg-accent"
           aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`}
         >
           <BellIcon />
           {unread > 0 && (
-            <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">
+            <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-rose-600 px-1 text-[9px] font-bold text-white">
               {unread > 9 ? '9+' : unread}
             </span>
           )}
         </Link>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-10 w-10"
-          onClick={() => setUserMenu((v) => !v)}
-          aria-label="Account menu"
-          aria-expanded={userMenu}
-        >
-          <ChevronDown className="h-5 w-5" />
-        </Button>
-        {userMenu && (
-          <div className="absolute right-3 top-14 w-52 nu-raised overflow-hidden rounded-xl border bg-popover p-1 shadow-lg">
-            <div className="px-3 py-2">
-              <p className="truncate text-sm font-semibold">{session.name}</p>
-              <p className="text-xs text-muted-foreground">{ROLE_LABEL[session.role]}</p>
-            </div>
-            <Link
-              href="/profile"
-              onClick={() => setUserMenu(false)}
-              className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-accent"
-            >
-              <BusFront className="h-4 w-4" /> Profile
-            </Link>
-            <Link
-              href="/settings"
-              onClick={() => setUserMenu(false)}
-              className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-accent"
-            >
-              <Settings className="h-4 w-4" /> Settings
-            </Link>
-            <button
+        {/* Radix DropdownMenu: Escape + outside-click + focus management for free (QA #24). */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Account menu">
+              <ChevronDown className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel>
+              <span className="block truncate text-sm font-semibold text-foreground">{session.name}</span>
+              <span className="block text-xs font-normal text-muted-foreground">{ROLE_LABEL[session.role]}</span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/profile">
+                <BusFront className="h-4 w-4" /> Profile
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/settings">
+                <Settings className="h-4 w-4" /> Settings
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
               onClick={logout}
-              className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-rose-600 hover:bg-rose-500/10"
+              className="text-rose-600 focus:text-rose-700 dark:text-rose-400"
             >
-              <LogOut className="h-4 w-4" /> Log out
-            </button>
-          </div>
-        )}
+              <LogOut className="h-4 w-4" /> Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </header>
 
       {/* Offline ribbon */}

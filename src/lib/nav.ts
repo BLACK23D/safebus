@@ -74,13 +74,13 @@ export const BOTTOM_NAV: Record<Role, NavItem[]> = {
     { href: '/attendance', label: 'Attendance', icon: ClipboardCheck },
     { href: '/schedule', label: 'Schedule', icon: Calendar },
     { href: '/messages', label: 'Messages', icon: MessageSquare },
-    { href: '/notifications', label: 'Alerts', icon: Bell },
+    { href: '/notifications', label: 'Notifications', icon: Bell },
   ],
   driver: [
     { href: '/driver', label: 'Trips', icon: BusFront },
     { href: '/messages', label: 'Messages', icon: MessageSquare },
     { href: '/emergency', label: 'Emergency', icon: Siren },
-    { href: '/notifications', label: 'Alerts', icon: Bell },
+    { href: '/notifications', label: 'Notifications', icon: Bell },
     { href: '/profile', label: 'Profile', icon: UserRound },
   ],
   admin: [
@@ -88,13 +88,13 @@ export const BOTTOM_NAV: Record<Role, NavItem[]> = {
     { href: '/students', label: 'Students', icon: UserRound },
     { href: '/trips', label: 'Trips', icon: Calendar },
     { href: '/messages', label: 'Messages', icon: MessageSquare },
-    { href: '/notifications', label: 'Alerts', icon: Bell },
+    { href: '/notifications', label: 'Notifications', icon: Bell },
   ],
   superadmin: [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/schools', label: 'Schools', icon: School },
     { href: '/users', label: 'Users', icon: Users },
     { href: '/messages', label: 'Messages', icon: MessageSquare },
-    { href: '/notifications', label: 'Alerts', icon: Bell },
+    { href: '/notifications', label: 'Notifications', icon: Bell },
   ],
 };

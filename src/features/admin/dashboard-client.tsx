@@ -26,6 +26,7 @@ import { EmptyState, ErrorState, PageHeader, PageSkeleton, StatCard, StatusBadge
 import { useJoinTrip, useSocketEvent } from '@/components/providers/socket-provider';
 import { SE } from '@/lib/socket/events';
 import { idOf } from '@/features/admin/use-resource';
+import { formatTime, TRIP_TYPE_SHORT, type TripType } from '@/features/trips/shared';
 
 /**
  * LiveMap is owned by Task 4 and may land after this file — import it lazily so
@@ -100,14 +101,6 @@ const FALLBACK_CENTER = { lat: 30.2672, lng: -97.7431 };
 
 function errOf(r: PromiseSettledResult<unknown>): string | null {
   return r.status === 'rejected' ? (r.reason instanceof Error ? r.reason.message : 'Request failed') : null;
-}
-
-function fmtTime(v?: string): string {
-  if (!v) return '—';
-  const d = new Date(v);
-  return Number.isNaN(d.getTime())
-    ? '—'
-    : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function busPosition(t: TripRow): { lat: number; lng: number } | null {
@@ -271,7 +264,7 @@ export function AdminDashboardClient() {
         { label: 'Picked up', value: att.pickedUp, cls: 'bg-brand-500/15 text-brand-700 dark:text-brand-400' },
         { label: 'Dropped off', value: att.droppedOff, cls: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400' },
         { label: 'Absent', value: att.absent, cls: 'bg-rose-500/15 text-rose-700 dark:text-rose-400' },
-        { label: 'Pending', value: att.pending, cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
+        { label: 'Pending', value: att.pending, cls: 'bg-amber-500/15 text-amber-800 dark:text-amber-300' },
       ]
     : [];
   const fleetTotal = analytics ? analytics.fleetStatus.reduce((acc, f) => acc + f.count, 0) : 0;
@@ -319,7 +312,7 @@ export function AdminDashboardClient() {
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                   {attChips.map((c) => (
                     <div key={c.label} className={cn('rounded-xl px-3 py-2.5', c.cls)}>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">{c.label}</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide">{c.label}</p>
                       <p className="text-xl font-black tabular-nums">{c.value}</p>
                     </div>
                   ))}
@@ -489,11 +482,11 @@ export function AdminDashboardClient() {
                             <StatusBadge status={t.status} />
                           </div>
                           <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                            {t.type ? t.type.charAt(0).toUpperCase() + t.type.slice(1) : 'Trip'} ·{' '}
+                            {t.type ? (TRIP_TYPE_SHORT[t.type as TripType] ?? t.type) : 'Trip'} ·{' '}
                             {t.route?.name ?? 'Unassigned route'}
                           </p>
                           <p className="truncate text-xs text-muted-foreground">
-                            {t.driver?.name ?? 'No driver'} · started {fmtTime(t.startedAt)}
+                            {t.driver?.name ?? 'No driver'} · started {formatTime(t.startedAt)}
                           </p>
                         </button>
                       );

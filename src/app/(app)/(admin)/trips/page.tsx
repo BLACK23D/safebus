@@ -4,6 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { ResourceTable, type Col, type FieldDef } from '@/components/admin/resource-table';
 import { idOf, useResource, type Row } from '@/features/admin/use-resource';
+import { formatTime, TRIP_TYPE_SHORT, type TripType } from '@/features/trips/shared';
 
 type TripRow = Row & {
   type?: string;
@@ -21,13 +22,11 @@ type TripRow = Row & {
 function fmtDateTime(v?: string): string {
   if (!v) return '—';
   const d = new Date(v);
-  return Number.isNaN(d.getTime())
-    ? '—'
-    : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return Number.isNaN(d.getTime()) ? '—' : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${formatTime(v)}`;
 }
 
 const fields: FieldDef<TripRow>[] = [
-  { key: 'type', label: 'Type', type: 'select', options: ['pickup', 'dropoff'], required: true },
+  { key: 'type', label: 'Type', type: 'select', options: [{ value: 'pickup', label: 'Pickup' }, { value: 'dropoff', label: 'Drop-off' }], required: true },
   { key: 'routeId', label: 'Route', type: 'ref', refPath: '/routes', required: true },
   { key: 'busId', label: 'Bus', type: 'ref', refPath: '/buses', labelKey: 'number', required: true },
   { key: 'driverId', label: 'Driver', type: 'ref', refPath: '/users?role=driver', required: true },
@@ -51,9 +50,7 @@ export default function TripsPage() {
         key: 'type',
         label: 'Type',
         render: (r) => (
-          <span className="capitalize">
-            {r.type ? r.type.charAt(0).toUpperCase() + r.type.slice(1) : '—'}
-          </span>
+          <span className="capitalize">{r.type ? (TRIP_TYPE_SHORT[r.type as TripType] ?? r.type) : '—'}</span>
         ),
       },
       {

@@ -56,7 +56,7 @@ const TYPE_TONES: Record<string, string> = {
   attendance: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
   emergency: 'bg-rose-500/15 text-rose-700 dark:text-rose-400',
   broadcast: 'bg-violet-500/15 text-violet-700 dark:text-violet-400',
-  'edit-request': 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  'edit-request': 'bg-amber-500/15 text-amber-800 dark:text-amber-300',
 };
 
 function when(iso?: string): string {

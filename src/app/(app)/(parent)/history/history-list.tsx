@@ -133,7 +133,7 @@ export function HistoryList({ kind }: { kind: HistoryKind }) {
                           'grid h-11 w-11 shrink-0 place-items-center rounded-xl',
                           t.type === 'dropoff'
                             ? 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400'
-                            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+                            : 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
                         )}
                       >
                         {t.type === 'dropoff' ? <Sunset className="h-5 w-5" /> : <Sunrise className="h-5 w-5" />}
@@ -167,7 +167,9 @@ export function HistoryList({ kind }: { kind: HistoryKind }) {
                         <p className="truncate font-semibold">{r.name}</p>
                         <p className="mt-0.5 text-sm text-muted-foreground">
                           {day(r.createdAt)}
-                          {Array.isArray(r.stopIds) && r.stopIds.length > 0 ? ` · ${r.stopIds.length} stops` : ''}
+                          {Array.isArray(r.stopIds) && r.stopIds.length > 0
+                            ? ` · ${r.stopIds.length} stop${r.stopIds.length === 1 ? '' : 's'}`
+                            : ''}
                         </p>
                       </div>
                       <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />

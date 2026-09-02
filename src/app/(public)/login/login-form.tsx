@@ -83,7 +83,9 @@ export function LoginForm() {
     } catch (err) {
       if (err instanceof ApiError) {
         setFieldErrors(err.fieldErrors ?? {});
-        if (!err.fieldErrors?.email && !err.fieldErrors?.password) setFormError(err.message);
+        if (!err.fieldErrors?.email && !err.fieldErrors?.password) {
+          setFormError(err.status === 401 ? 'Incorrect email or password.' : err.message);
+        }
       } else {
         setFormError('Something went wrong — please try again.');
       }
@@ -93,7 +95,7 @@ export function LoginForm() {
   }
 
   return (
-    <AuthShell title="Welcome back" subtitle="Sign in to follow your student's ride">
+    <AuthShell title="Welcome back" subtitle="Sign in to follow your child's ride">
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         {sessionExpired && (
           <SoftBanner>Your session expired — please sign in again.</SoftBanner>

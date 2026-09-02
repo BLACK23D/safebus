@@ -13,7 +13,7 @@ import { BusFront, Clock, RefreshCw, Route as RouteIcon, Sunrise, Sunset } from 
 
 import { http } from '@/lib/api/client';
 import { SE } from '@/lib/socket/events';
-import { useSocketEvent, useSocketStatus } from '@/components/providers/socket-provider';
+import { useSocketEvent, useSocketStatus, socketStatusLabel, useOnline } from '@/components/providers/socket-provider';
 import { EmptyState, ErrorState, PageHeader, PageSkeleton, StatusBadge } from '@/components/ui/kit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ export default function SchedulePage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const live = useSocketStatus();
+  const online = useOnline();
 
   const applyList = useCallback((data: TripList) => {
     setTrips(data.items);
@@ -101,9 +102,9 @@ export default function SchedulePage() {
             >
               <span
                 aria-hidden
-                className={cn('h-1.5 w-1.5 rounded-full', live ? 'animate-pulse bg-emerald-500' : 'bg-amber-500')}
+                className={cn('h-1.5 w-1.5 rounded-full', live ? 'animate-pulse bg-emerald-600' : 'bg-amber-600')}
               />
-              {live ? 'Live' : 'Reconnecting…'}
+              {socketStatusLabel(live, online)}
             </Badge>
             <Button variant="ghost" size="icon" className="h-11 w-11" onClick={refresh} aria-label="Refresh schedule">
               <RefreshCw className={cn('h-4 w-4', busy && 'animate-spin')} aria-hidden />
@@ -132,7 +133,7 @@ export default function SchedulePage() {
                   className={cn(
                     'grid h-11 w-11 shrink-0 place-items-center rounded-xl',
                     t.type === 'pickup'
-                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                      ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
                       : 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
                   )}
                 >

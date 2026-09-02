@@ -504,7 +504,8 @@ export function ResourceTable<T extends Row>({
           {res.pages > 1 && (
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Page {res.page} of {res.pages} · {res.total} total
+                Page {res.page} of {res.pages} · {res.total}{' '}
+                {res.total === 1 ? noun.toLowerCase() : title.toLowerCase()}
               </p>
               <div className="flex items-center gap-2">
                 <Button
@@ -563,7 +564,7 @@ export function ResourceTable<T extends Row>({
                       disabled={f.type === 'ref' && refsLoading}
                     >
                       <SelectTrigger id={id} className="min-h-11 w-full" aria-label={f.label}>
-                        <SelectValue placeholder={f.type === 'ref' ? 'Select…' : 'Choose…'} />
+                        <SelectValue placeholder="Select…" />
                       </SelectTrigger>
                       <SelectContent className="max-h-64 overflow-y-auto scrollbar-thin">
                         {f.type === 'ref' && <SelectItem value={NONE}>— None —</SelectItem>}

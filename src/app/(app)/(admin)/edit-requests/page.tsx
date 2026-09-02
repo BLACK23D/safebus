@@ -111,7 +111,7 @@ export default function EditRequestsPage() {
       <div className={cn('flex items-center gap-2', stacked && 'pt-1')}>
         <Button
           size="sm"
-          className="min-h-11 gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+          className="min-h-11 gap-1.5 bg-emerald-700 text-white hover:bg-emerald-800"
           disabled={busyId === idOf(r)}
           onClick={() => void decide(idOf(r), 'approve')}
           aria-label={`Approve request for ${r.studentName ?? 'student'}`}
@@ -137,7 +137,7 @@ export default function EditRequestsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Edit Requests"
-        subtitle="Review parent-submitted child profile changes"
+        subtitle="Review parent-submitted student profile changes"
         actions={
           <Button
             variant="outline"

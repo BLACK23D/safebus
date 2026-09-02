@@ -13,6 +13,36 @@ const Ctx = createContext<SocketCtx>({ socket: null, connected: false });
 export const useSocket = () => useContext(Ctx);
 export const useSocketStatus = () => useContext(Ctx).connected;
 
+/* ── Shared connection vocabulary (QA M10) ───────────────────────────────
+ * One set of labels for every live-status chip: "Live" (connected),
+ * "Reconnecting…" (socket down, browser online), "Offline" (browser offline). */
+export const SOCKET_STATUS = {
+  LIVE: 'Live',
+  RECONNECTING: 'Reconnecting…',
+  OFFLINE: 'Offline',
+} as const;
+
+export function socketStatusLabel(connected: boolean, online: boolean): string {
+  if (!online) return SOCKET_STATUS.OFFLINE;
+  return connected ? SOCKET_STATUS.LIVE : SOCKET_STATUS.RECONNECTING;
+}
+
+/** Browser network state shared by the status chips (replaces per-page listeners). */
+export function useOnline(): boolean {
+  const [online, setOnline] = useState(true);
+  useEffect(() => {
+    const sync = () => setOnline(navigator.onLine);
+    sync();
+    addEventListener('online', sync);
+    addEventListener('offline', sync);
+    return () => {
+      removeEventListener('online', sync);
+      removeEventListener('offline', sync);
+    };
+  }, []);
+  return online;
+}
+
 /**
  * Socket.IO provider v2 — fetches a fresh handshake token on EVERY connect/reconnect
  * via the auth callback (access tokens expire). Browser connects same-origin through

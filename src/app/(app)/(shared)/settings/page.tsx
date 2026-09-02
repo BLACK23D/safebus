@@ -15,7 +15,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useSocketStatus } from '@/components/providers/socket-provider';
+import { useSocketStatus, socketStatusLabel, useOnline } from '@/components/providers/socket-provider';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/kit';
@@ -31,7 +31,7 @@ const THEME_OPTIONS: { value: ThemeChoice; label: string; icon: typeof Sun }[] =
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const socketConnected = useSocketStatus();
-  const [online, setOnline] = useState(true);
+  const online = useOnline();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -39,18 +39,6 @@ export default function SettingsPage() {
     // synchronous setState in the effect body.
     const t = setTimeout(() => setMounted(true), 0);
     return () => clearTimeout(t);
-  }, []);
-
-  // Network status — updates flow through event listeners (no sync setState in effects).
-  useEffect(() => {
-    const sync = () => setOnline(navigator.onLine);
-    sync();
-    addEventListener('online', sync);
-    addEventListener('offline', sync);
-    return () => {
-      removeEventListener('online', sync);
-      removeEventListener('offline', sync);
-    };
   }, []);
 
   const enablePush = async () => {
@@ -121,28 +109,28 @@ export default function SettingsPage() {
           <ul className="mt-4 space-y-2 text-sm">
             <li className="flex min-h-10 items-center gap-2 rounded-xl border bg-background/50 px-3">
               {online ? (
-                <Wifi className="h-4 w-4 text-emerald-500" aria-hidden />
+                <Wifi className="h-4 w-4 text-emerald-600" aria-hidden />
               ) : (
-                <WifiOff className="h-4 w-4 text-rose-500" aria-hidden />
+                <WifiOff className="h-4 w-4 text-rose-600" aria-hidden />
               )}
               <span className="font-medium">Internet</span>
-              <span className={cn('ml-auto font-semibold', online ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400')}>
+              <span className={cn('ml-auto font-semibold', online ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400')}>
                 {online ? 'Online' : 'Offline'}
               </span>
             </li>
             <li className="flex min-h-10 items-center gap-2 rounded-xl border bg-background/50 px-3">
               <Radio
-                className={cn('h-4 w-4', socketConnected ? 'text-emerald-500' : 'text-amber-500')}
+                className={cn('h-4 w-4', socketConnected ? 'text-emerald-600' : 'text-amber-600')}
                 aria-hidden
               />
               <span className="font-medium">Live updates</span>
-              <span className={cn('ml-auto font-semibold', socketConnected ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400')}>
-                {socketConnected ? 'Connected' : 'Reconnecting…'}
+              <span className={cn('ml-auto font-semibold', socketConnected ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400')}>
+                {socketStatusLabel(socketConnected, online)}
               </span>
             </li>
           </ul>
           {!online && (
-            <p className="mt-3 rounded-xl bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+            <p className="mt-3 rounded-xl bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-800 dark:text-amber-300">
               You are offline — emergency reporting and attendance verification are paused until the connection
               returns.
             </p>

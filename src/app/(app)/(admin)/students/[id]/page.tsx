@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, StatusBadge } from '@/components/ui/kit';
 
-export const metadata: Metadata = { title: 'Student — SafeBus' };
+export const metadata: Metadata = { title: 'Student profile' };
 
 type StudentDetail = {
   id?: string;

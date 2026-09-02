@@ -90,6 +90,10 @@ export function VerifyClient() {
               : 'Open the link we emailed you.'}{' '}
             Didn't get it? Check your spam folder, then try signing in — we'll offer to resend.
           </p>
+          <p className="mt-2 rounded-lg border border-dashed px-3 py-1.5 text-[11px] leading-snug text-muted-foreground">
+            Sandbox only — this environment has no mail service, so new accounts are verified
+            automatically and this page previews the real flow.
+          </p>
           <Button asChild variant="outline" className="mt-5 min-h-11 w-full rounded-xl">
             <Link href="/login">
               <MailCheck className="h-4 w-4" /> Back to sign in

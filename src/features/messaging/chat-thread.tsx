@@ -9,6 +9,7 @@ import { SE } from '@/lib/socket/events';
 import { useSocketEvent } from '@/components/providers/socket-provider';
 import type { AppSession, Role } from '@/lib/auth/session';
 import { cn } from '@/lib/utils';
+import { formatTime } from '@/features/trips/shared';
 import { Button } from '@/components/ui/button';
 import { StatusBadge, EmptyState, ErrorState } from '@/components/ui/kit';
 
@@ -24,11 +25,6 @@ type Msg = {
 
 type Peer = { id: string; name: string; role: Role };
 
-function clock(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-}
 
 export function ChatThread({ session, userId }: { session: AppSession; userId: string }) {
   const [peer, setPeer] = useState<Peer | null>(null);
@@ -224,7 +220,7 @@ export function ChatThread({ session, userId }: { session: AppSession; userId: s
                           mine && 'justify-end',
                         )}
                       >
-                        <span>{clock(m.createdAt)}</span>
+                        <span>{formatTime(m.createdAt)}</span>
                         {mine && (
                           <span aria-label={m.read ? 'Read' : 'Sent'}>
                             {m.read ? (

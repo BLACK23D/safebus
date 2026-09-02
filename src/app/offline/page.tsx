@@ -17,7 +17,7 @@ export default function OfflinePage() {
   return (
     <div className="grid min-h-dvh place-items-center p-6 text-center">
       <div className="max-w-md">
-        <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-brand-500/10 text-brand-600">
+        <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
           <Bus className="h-8 w-8" />
         </span>
         <h1 className="mt-5 text-2xl font-bold">You&apos;re offline</h1>
@@ -26,7 +26,8 @@ export default function OfflinePage() {
           before is lost{online ? ' — connection restored, reload to continue.' : '.'}
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
-          Safety writes (emergencies, attendance, trip actions) are never queued for replay.
+          For your safety, emergency reports, attendance and trip actions must be sent while you are
+          connected — they are never stored on the device to send later.
         </p>
         <Button className="mt-5" onClick={() => location.reload()} disabled={!online}>
           {online ? 'Reload' : 'Waiting for connection…'}

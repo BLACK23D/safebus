@@ -162,6 +162,9 @@ export function Field({
       <Input
         id={id}
         className="min-h-11 rounded-xl"
+        // Password managers/extensions can mutate input attributes before hydration;
+        // suppress the React attribute-only mismatch warning (QA #25).
+        suppressHydrationWarning
         aria-invalid={error ? true : undefined}
         aria-describedby={describe(id, error, hint)}
         {...inputProps}
@@ -194,6 +197,7 @@ export function PasswordField({
           id={id}
           type={show ? 'text' : 'password'}
           className="min-h-11 rounded-xl pr-12"
+          suppressHydrationWarning
           aria-invalid={error ? true : undefined}
           aria-describedby={describe(id, error, hint)}
           {...inputProps}
@@ -213,7 +217,7 @@ export function PasswordField({
 
 /** Backend-enforced strong-password rule (contract §1), shown as a hint. */
 export const PASSWORD_HINT = (
-  <>Min 8 chars with uppercase, lowercase, number and symbol (backend-validated)</>
+  <>Use at least 8 characters, mixing uppercase, lowercase, numbers and symbols</>
 );
 
 /* ── Role segmented control (login) ─────────────────────────────────────── */

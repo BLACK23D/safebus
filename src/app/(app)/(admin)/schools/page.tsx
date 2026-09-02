@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { getSession } from '@/lib/api/server';
 import { SchoolsClient } from '@/features/admin/schools-client';
 
-export const metadata: Metadata = { title: 'Schools — SafeBus' };
+export const metadata: Metadata = { title: 'Schools' };
 
 /** Superadmin-only page — the middleware is UX-only, so re-check server-side (§2). */
 export default async function SchoolsPage() {

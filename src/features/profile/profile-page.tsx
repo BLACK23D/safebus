@@ -376,7 +376,7 @@ function ChildrenPanel({ onChanged }: { onChanged: () => void }) {
               <li key={r.id} className="rounded-xl border bg-background/50 p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-semibold">
-                    {r.studentName ?? 'Child'} — {r.field}
+                    {r.studentName ?? 'Child'} — {r.field === 'grade' ? 'Grade change' : r.field === 'name' ? 'Name change' : `${r.field} change`}
                   </p>
                   <StatusBadge status={r.status} />
                   <span className="ml-auto text-xs text-muted-foreground">{when(r.createdAt)}</span>

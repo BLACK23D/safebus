@@ -17,7 +17,7 @@ const STEPS = [
   {
     icon: MapPin,
     title: 'Follow the bus live',
-    body: 'Watch your student’s bus move along its route in real time, with ETAs for each stop and an alert the moment it arrives.',
+    body: 'Watch your child’s bus move along its route in real time, with ETAs for each stop and an alert the moment it arrives.',
   },
   {
     icon: ShieldCheck,
@@ -27,7 +27,7 @@ const STEPS = [
   {
     icon: Bell,
     title: 'Instant alerts',
-    body: 'Get notified when the trip starts, when the bus is 10 then 5 minutes away, and the second your student is safely handed over.',
+    body: 'Get notified when the trip starts, when the bus is 10 then 5 minutes away, and the second your child is safely handed over.',
   },
 ] as const;
 
@@ -87,8 +87,12 @@ export default function OnboardingPage() {
           <p className="mt-3 text-sm font-medium text-brand-600 dark:text-brand-400">SafeBus</p>
         </div>
 
-        {/* key={step} re-runs the reveal animation on every step change */}
-        <div key={step} className="reveal mt-8 flex flex-col items-center text-center">
+        {/* key={step} re-runs the reveal animation on every step change.
+            Steps sit on a bg-card panel (QA #20) so body text never sits on the aurora. */}
+        <div
+          key={step}
+          className="reveal nu-raised mt-8 flex flex-col items-center rounded-2xl border bg-card p-6 text-center sm:p-8"
+        >
           <span className="grid h-24 w-24 place-items-center rounded-3xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
             <Icon className="h-11 w-11" aria-hidden />
           </span>

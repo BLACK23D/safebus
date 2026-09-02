@@ -18,6 +18,7 @@ import { SE } from '@/lib/socket/events';
 import { useSocketEvent } from '@/components/providers/socket-provider';
 import type { AppSession } from '@/lib/auth/session';
 import { cn } from '@/lib/utils';
+import { TRIP_TYPE_SHORT, type TripType } from '@/features/trips/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState, ErrorState, PageHeader, PageSkeleton, StatusBadge } from '@/components/ui/kit';
@@ -233,7 +234,7 @@ export function AttendanceClient({ session }: { session: AppSession }) {
             <StatusBadge key={s} status={s} />
           ))}
           <span className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> {summary.verified} verified · read-only view
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" /> {summary.verified} verified · read-only view
           </span>
         </div>
       )}
@@ -268,7 +269,7 @@ export function AttendanceClient({ session }: { session: AppSession }) {
                                 : 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300',
                             )}
                           >
-                            {r.type}
+                            {TRIP_TYPE_SHORT[r.type as TripType] ?? r.type}
                           </span>
                           <StatusBadge status={r.status} />
                         </div>
@@ -282,7 +283,7 @@ export function AttendanceClient({ session }: { session: AppSession }) {
                           <span
                             className={cn(
                               'inline-flex items-center gap-1',
-                              r.verified && 'text-emerald-600 dark:text-emerald-400',
+                              r.verified && 'text-emerald-700 dark:text-emerald-400',
                             )}
                           >
                             {r.verified ? (
@@ -330,7 +331,7 @@ export function AttendanceClient({ session }: { session: AppSession }) {
                           {code.code}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {code.type} code · expires in {left}s
+                          {TRIP_TYPE_SHORT[code.type as TripType] ?? code.type} code · expires in {left}s
                         </span>
                       </div>
                     )}
@@ -352,7 +353,7 @@ export function AttendanceClient({ session }: { session: AppSession }) {
                 <ChevronLeft className="h-4 w-4" /> Previous
               </Button>
               <span className="text-sm text-muted-foreground tabular-nums">
-                Page {data.page} of {data.pages} · {data.total} records
+                Page {data.page} of {data.pages} · {data.total} record{data.total === 1 ? '' : 's'}
               </span>
               <Button
                 variant="outline"

@@ -74,7 +74,7 @@ export function RegisterSW() {
       className="fixed bottom-24 right-4 z-50 w-[calc(100%-2rem)] max-w-sm rounded-xl border bg-card p-4 shadow-lg md:bottom-6 md:right-6"
     >
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-500/10 text-brand-600">
+        <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400">
           <RefreshCw className="h-5 w-5" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
@@ -85,16 +85,16 @@ export function RegisterSW() {
             A new version of SafeBus is ready. Reload to apply it — it only takes a second.
           </p>
           {activeTrip && (
-            <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-500/10 px-2 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+            <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-500/10 px-2 py-1.5 text-xs font-medium text-amber-800 dark:text-amber-300">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               You have an active trip open. Finish or hand off the trip before updating.
             </p>
           )}
           <div className="mt-3 flex justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setDismissed(true)}>
+            <Button variant="ghost" size="sm" className="min-h-11" onClick={() => setDismissed(true)}>
               Later
             </Button>
-            <Button size="sm" onClick={() => waiting.postMessage('SKIP_WAITING')}>
+            <Button size="sm" className="min-h-11" onClick={() => waiting.postMessage('SKIP_WAITING')}>
               Reload app
             </Button>
           </div>
