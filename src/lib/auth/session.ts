@@ -1,4 +1,5 @@
 import type { NextResponse } from 'next/server';
+import { EMBEDDED_COOKIES } from '@/lib/env';
 
 export const COOKIES = { at: 'sb_at', rt: 'sb_rt', session: 'sb_session' } as const;
 
@@ -63,19 +64,31 @@ export function applySessionCookies(
   s: AppSession | null | undefined,
   secure: boolean,
 ) {
-  const base = {
-    httpOnly: true as const,
-    secure,
-    sameSite: 'lax' as const,
-    path: '/',
-  };
+  // Embedded mode (AUTH_COOKIE_EMBEDDED=1): cross-site iframe hosts drop
+  // SameSite=Lax/Strict Set-Cookie, so use CHIPS (None + Secure + Partitioned).
+  // Secure is mandatory for SameSite=None; allowed on http only for localhost.
+  const base = EMBEDDED_COOKIES
+    ? {
+        httpOnly: true as const,
+        secure: true,
+        sameSite: 'none' as const,
+        partitioned: true,
+        path: '/',
+      }
+    : {
+        httpOnly: true as const,
+        secure,
+        sameSite: 'lax' as const,
+        path: '/',
+      };
   res.cookies.set(COOKIES.at, t.accessToken, { ...base, maxAge: jwtMaxAge(t.accessToken) });
   if (t.refreshToken) {
-    // Refresh cookie is scoped to the BFF path and SameSite=strict: it is never sent
-    // cross-site and never readable by page JS.
+    // Refresh cookie is scoped to the BFF path: never readable by page JS. In
+    // first-party mode it is SameSite=strict; in embedded mode it rides the
+    // partitioned None base above (strict would be dropped in the iframe).
     res.cookies.set(COOKIES.rt, t.refreshToken, {
       ...base,
-      sameSite: 'strict',
+      sameSite: EMBEDDED_COOKIES ? ('none' as const) : ('strict' as const),
       path: '/api',
       maxAge: REFRESH_TTL_S,
     });
@@ -86,10 +99,13 @@ export function applySessionCookies(
 }
 
 export function clearSessionCookies(res: NextResponse) {
+  const drop = EMBEDDED_COOKIES
+    ? { httpOnly: true as const, secure: true, sameSite: 'none' as const, partitioned: true }
+    : { httpOnly: true as const };
   for (const name of [COOKIES.at, COOKIES.rt, COOKIES.session]) {
-    res.cookies.set(name, '', { httpOnly: true, path: '/', maxAge: 0 });
+    res.cookies.set(name, '', { ...drop, path: '/', maxAge: 0 });
   }
-  res.cookies.set(COOKIES.rt, '', { httpOnly: true, path: '/api', maxAge: 0 });
+  res.cookies.set(COOKIES.rt, '', { ...drop, path: '/api', maxAge: 0 });
 }
 
 /** Extracts the token pair from any auth endpoint body ({data:{...}} or raw). */

@@ -299,3 +299,18 @@ Work Log:
 
 Stage Summary:
 - App re-verified live on Sep 2: all core journeys still green. Seed freshness issue fixed (today's trips present). Backend restart/launch pattern discovered and documented — always use the orphaned-subshell launch; plain nohup/setsid from a tool call will be reaped at call end.
+
+---
+Task ID: 9.2
+Agent: orchestrator (main)
+Task: Fix user-reported "registered as parent but can't log in" — session cookies dropped in the preview panel's cross-site iframe.
+
+Work Log:
+- Diagnosed from dev.log: user's register → 201, then six POST /api/auth/login → 200 each immediately followed by GET /login?next=%2Ftrack&reason=signin. Credentials were correct; the middleware bounced every navigation because no session cookie was present.
+- Root cause: the preview panel renders the app inside a CROSS-SITE iframe. Browsers refuse to SET SameSite=Lax/Strict cookies from third-party contexts, so the 200 login response's Set-Cookie (Lax/strict, no Secure) was silently discarded → no sb_session → bounce. Reproduced deterministically with a localhost:9999 page iframing http://127.0.0.1:81/login (login inside the iframe bounced back to "Welcome back").
+- Fix (src/lib/env.ts, src/lib/auth/session.ts, .env): added EMBEDDED_COOKIES (AUTH_COOKIE_EMBEDDED=1). When set, applySessionCookies/clearSessionCookies issue all three auth cookies as CHIPS: SameSite=None; Secure; Partitioned (Next's @edge-runtime cookies natively serialize `partitioned`). Works in cross-site iframes (partitioned per top-level site) and as a normal cookie top-level; requires HTTPS or localhost (Chrome/FF exempt localhost from the Secure requirement over http). First-party deployments without the flag keep the original Lax/Strict shape.
+- Verified: Set-Cookie now carries `Secure; SameSite=none; Partitioned` (curl). Browser-verified BOTH contexts after fix: (a) cross-site iframe localhost:9999 ⊃ 127.0.0.1:81 — parent demo login lands on /track with "Live" socket chip, child switcher, scheduled B-101 trip, notifications badge; (b) top-level localhost:81 — same green result. tsc: 0 errors in src/; eslint clean.
+- Contract: docs/CONTRACTS.md §0.b documents both cookie modes.
+
+Stage Summary:
+- Login inside embedded/iframe preview contexts now works (CHIPS cookies). User's account (deniskelvin23@outloook.com, parent, active) confirmed present in backend DB — they can log in after refreshing the preview. Note: their registered email literally contains "outloook" (triple o) — flagged to the user since mistyping it in the login form would 401.

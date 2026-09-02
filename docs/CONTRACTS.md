@@ -8,6 +8,23 @@ sides. UI must not invent fields; backend must not rename without updating this 
 Base URL (server-to-server): `BACKEND_URL` (default `http://localhost:5000`).
 Browser → BFF → backend: same-origin `/api/*`.
 
+### 0.b BFF session cookies — V
+
+The BFF keeps tokens out of the browser with HttpOnly cookies (set on login/register/
+claim/refresh): `sb_at` (access, path `/`), `sb_rt` (refresh, path `/api`, 7d),
+`sb_session` (unsigned role/id mirror for UX redirects only, 7d).
+
+Two modes, selected by `AUTH_COOKIE_EMBEDDED=1`:
+
+- **first-party (default)**: `SameSite=Lax` (`sb_rt`: `SameSite=Strict`), `Secure` when
+  the app URL is https. Use for same-origin deployments.
+- **embedded** (sandbox/preview panel hosts the app in a cross-site iframe): browsers
+  drop Lax/Strict cookies in third-party contexts — login would return 200 yet never
+  stick. In this mode all three cookies are issued as CHIPS:
+  `SameSite=None; Secure; Partitioned` (allowed in cross-site iframes, partitioned per
+  top-level site; behaves like a normal cookie top-level). Requires a trustworthy
+  context (HTTPS or http://localhost).
+
 ## 0. Envelopes & pagination — V
 
 - Success: `{ "success": true, "data": <T> }` (HTTP 200/201)
