@@ -373,3 +373,17 @@ Work Log:
 
 Stage Summary:
 - Login works in both iframe and top-level contexts and is now regression-proof against .env resets (code-level default). NOTE for user: their self-registered account was destroyed by the earlier demo reseed and cannot be restored (password unknown) — they should re-register (auto-verifies in sandbox) or use the demo accounts. Dev + backend healthy on :3000/:5000 with today's seed.
+
+---
+Task ID: 9.4
+Agent: orchestrator (main)
+Task: Fix user-reported "getting errors when trying to login" — stale service-worker-pinned JS from an older build running in the user's persistent preview browser.
+
+Work Log:
+- Log forensics: the user's three POST /api/auth/login all returned 200 (parent ×2 → /track, driver ×1 → /driver) — auth itself was never failing. Anomalies after login: (a) browser called `/api/_bff/socket-token` (401 pre-auth, 404 post-auth) — a route that existed only in an older build and was renamed to `/api/socket-token` in Task 8 (underscore dirs are private in Next 16); current source has zero `_bff` references; (b) the user's /track loads produced NO client data fetches (hydration breakage from old chunks + fresh RSC); (c) `GET /offline` rendered — v1 SW's offline fallback for a failed navigation (also correlates with the 9.3 dev-server restart window).
+- Root cause: public/sw.js v1 served `/_next/static/*` CACHE-FIRST. Dev-mode chunk URLs are stable across server rebuilds, so the user's persistent preview browser (SW registered there — https origin passes the register gate; my localhost:81 test browsers register too but 127.0.0.1 does NOT, register-sw.tsx:26) replayed old cached JS forever. Every fresh test browser had an empty cache — masking the bug in all prior verification.
+- Fix (public/sw.js → v2): (1) install now purges ALL caches not matching the current version — self-heals users on their next reload even before the new worker activates; (2) `/_next/static` + /icons are NETWORK-FIRST with cache fallback (offline still served from cache); (3) kept consent-gated updates (update banner → SKIP_WAITING), navigation network-only, and /api + /socket.io exclusions untouched.
+- Browser-verified (session swtest, closed after): v2 activates on localhost; register gate confirmed (127.0.0.1 skips, localhost registers — matches the user's https preview registering). Poison test: planted `POISONED` entry in assets-v2 for a live chunk URL → fetch returned fresh network content AND healed the cache entry (old SW would have served the poison). Upgrade test: planted legacy assets-v1 with an old-build chunk + touched sw.js → reload → legacy cache purged, "Update available / Reload app" banner appeared (consent flow intact). Regressions with SW active: parent demo login → /track with Live + "Scheduled Morning pickup B-101"; driver demo login → /driver with Live + "2 scheduled"; zero JS errors; dev.log shows /api/socket-token 200, trips/notifications 200, and no `_bff` calls from current code.
+
+Stage Summary:
+- The "login errors" were stale-JS artifacts in the user's browser, not an auth failure: SW v1 cache-first had pinned pre-rename chunks that call a route which no longer exists (404) and break hydration on /track. SW v2 (network-first assets + install-time purge) makes stale-code pinning impossible while keeping the offline PWA behavior; existing users self-heal on their next reload. Auth, cookies, seed data, parent and driver flows all re-verified green.
