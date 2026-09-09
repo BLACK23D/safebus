@@ -2,17 +2,24 @@
    NEVER caches: /api/*, /socket.io, non-GET, Authorization/cookie-bearing requests,
    navigations (authenticated HTML). No Background Sync — safety writes are never replayed.
 
-   v2: asset strategy is NETWORK-FIRST with cache fallback (was cache-first). Dev-mode
-   chunk URLs are stable across server restarts, so cache-first pinned stale JS in
-   browsers that had visited an older build — the page HTML stayed fresh but ran old
-   code (symptom: calls to routes that no longer exist, hydration crashes after login).
-   Network-first always consults the server while online; the cache only serves when
-   the network is unreachable, so offline still works. Install also purges any cache
-   left by an older SW version so existing users self-heal on their next reload. */
-const VERSION = 'v2';
+   v3 hardening (issue #20):
+   - Subresource misses fail as 504 — the /offline HTML page is reserved for NAVIGATIONS
+     (a CSS/JS request must never receive text/html).
+   - The offline shell is REVALIDATED on activate (cache:'reload', best-effort) so a
+     deploy can no longer rot the precached page until the next version bump.
+   - Cache writes only store ok/basic responses and are handed to e.waitUntil, so a
+     transient 5xx can no longer poison the offline copy and the SW can be killed
+     mid-write safely.
+
+   v2 (history): asset strategy became NETWORK-FIRST with cache fallback — cache-first
+   pinned stale dev chunks (stable URLs across restarts) so pages ran old code. Install
+   purges foreign caches for self-healing. Updates remain consent-gated (SKIP_WAITING). */
+const VERSION = 'v3';
 const SHELL = `shell-${VERSION}`;
 const ASSETS = `assets-${VERSION}`;
 const PRECACHE = ['/offline', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+
+const OFFLINE_504 = () => new Response('', { status: 504, statusText: 'Offline' });
 
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
@@ -28,6 +35,16 @@ self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
     const keys = await caches.keys();
     await Promise.all(keys.filter((k) => k !== SHELL && k !== ASSETS).map((k) => caches.delete(k)));
+    // Revalidate the offline shell against the server so the precached HTML (and its
+    // asset references) cannot silently rot after a deploy. Best-effort: offline we
+    // simply keep the cached copy.
+    const shell = await caches.open(SHELL);
+    await Promise.all(PRECACHE.map(async (u) => {
+      try {
+        const fresh = await fetch(u, { cache: 'reload' });
+        if (fresh && fresh.ok) await shell.put(u, fresh);
+      } catch { /* offline — keep cached copy */ }
+    }));
     await self.clients.claim();
   })());
 });
@@ -37,6 +54,9 @@ const isExcluded = (url) =>
   url.pathname.startsWith('/api/') ||
   url.pathname.startsWith('/socket.io') ||
   url.pathname.startsWith('/_next/webpack-hmr');
+
+/** Only cache genuinely good, same-origin responses. */
+const cacheable = (res) => res && res.status === 200 && res.type === 'basic';
 
 self.addEventListener('fetch', (e) => {
   const req = e.request;
@@ -52,31 +72,41 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(ASSETS).then((c) => c.put(req, copy));
+          if (cacheable(res)) {
+            e.waitUntil(caches.open(ASSETS).then((c) => c.put(req, res.clone())));
+          }
           return res;
         })
-        .catch(() => caches.match(req).then((hit) => hit ?? caches.match('/offline'))),
+        .catch(() => caches.match(req).then((hit) => hit ?? OFFLINE_504())),
     );
     return;
   }
   // 2) Navigations and other cookie-bearing GETs — network-only + offline fallback.
+  //    Only NAVIGATIONS may receive the /offline HTML page; other cookie-bearing
+  //    requests fail as 504 so the app treats them as errors (never as HTML).
   if (req.mode === 'navigate' || req.headers.has('cookie')) {
-    e.respondWith(fetch(req).catch(() => caches.match('/offline')));
+    e.respondWith(
+      fetch(req).catch(() =>
+        req.mode === 'navigate'
+          ? caches.match('/offline').then((hit) => hit ?? OFFLINE_504())
+          : OFFLINE_504(),
+      ),
+    );
     return;
   }
   // 3) Other same-origin public GETs — stale-while-revalidate.
   //    (manifest.webmanifest and logo.svg land here — fine: public assets.)
   e.respondWith(
     caches.match(req).then((hit) => {
-      const network = fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(ASSETS).then((c) => c.put(req, copy));
-        return res;
-      }).catch(() => hit);
+      const network = fetch(req)
+        .then((res) => {
+          if (cacheable(res)) {
+            e.waitUntil(caches.open(ASSETS).then((c) => c.put(req, res.clone())));
+          }
+          return res;
+        })
+        .catch(() => hit ?? OFFLINE_504());
       return hit ?? network;
     }),
   );
 });
-
-/* v2 revalidation touch */

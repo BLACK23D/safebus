@@ -5,7 +5,6 @@
 
 import { useId, useRef, useState } from 'react';
 import Link from 'next/link';
-import { motion, useReducedMotion } from 'framer-motion';
 import { AlertCircle, Bus, CheckCircle2, Eye, EyeOff, Info } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -239,7 +238,6 @@ export function SegmentedRoles({
   options: RoleOption[];
   label: string;
 }) {
-  const reduced = useReducedMotion();
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   return (
     <div
@@ -276,13 +274,9 @@ export function SegmentedRoles({
             className="relative min-h-11 rounded-lg px-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           >
             {active && (
-              <motion.span
-                layoutId="sb-role-pill"
+              <span
                 aria-hidden
-                className="absolute inset-0 rounded-lg border bg-card nu-raised"
-                transition={
-                  reduced ? { duration: 0 } : { type: 'spring', stiffness: 500, damping: 42 }
-                }
+                className="absolute inset-0 rounded-lg border bg-card nu-raised motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95"
               />
             )}
             <span

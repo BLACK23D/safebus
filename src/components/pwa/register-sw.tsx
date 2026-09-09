@@ -9,6 +9,17 @@ import { Button } from '@/components/ui/button';
  *  this component remounts (e.g. Strict Mode double-effects, layout re-renders). */
 let reloadedOnce = false;
 
+const DISMISS_KEY = 'sw-update-dismissed-until';
+const DISMISS_TTL_MS = 2 * 60 * 60 * 1000; // honor "Later" for 2h per browser session
+
+function dismissUntil(): number {
+  try {
+    return Number(sessionStorage.getItem(DISMISS_KEY) || 0);
+  } catch {
+    return 0;
+  }
+}
+
 /**
  * PWA layer (blueprint §12):
  * - Registers /sw.js on HTTPS or localhost only.
@@ -24,6 +35,11 @@ export function RegisterSW() {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol !== 'https:' && location.hostname !== 'localhost') return;
+
+    // First-install detection BEFORE registering: clients.claim() on a first install
+    // fires controllerchange on pages that never had a controller — reloading then
+    // produced a surprise double-load for every new visitor (#20).
+    const hadController = !!navigator.serviceWorker.controller;
 
     let poll: ReturnType<typeof setInterval> | undefined;
 
@@ -51,6 +67,7 @@ export function RegisterSW() {
 
     const onControllerChange = () => {
       if (reloadedOnce) return;
+      if (!hadController) return; // first install (claim) — never reload
       reloadedOnce = true;
       window.location.reload();
     };
@@ -62,7 +79,7 @@ export function RegisterSW() {
     };
   }, []);
 
-  if (!waiting || dismissed) return null;
+  if (!waiting || dismissed || dismissUntil() > Date.now()) return null;
 
   const activeTrip = pathname?.startsWith('/driver/trips') ?? false;
 
@@ -91,7 +108,17 @@ export function RegisterSW() {
             </p>
           )}
           <div className="mt-3 flex justify-end gap-2">
-            <Button variant="ghost" size="sm" className="min-h-11" onClick={() => setDismissed(true)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="min-h-11"
+              onClick={() => {
+                try {
+                  sessionStorage.setItem(DISMISS_KEY, String(Date.now() + DISMISS_TTL_MS));
+                } catch { /* storage unavailable */ }
+                setDismissed(true); // re-render + dismissUntil() now hides the banner
+              }}
+            >
               Later
             </Button>
             <Button size="sm" className="min-h-11" onClick={() => waiting.postMessage('SKIP_WAITING')}>
