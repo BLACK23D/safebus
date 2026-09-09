@@ -153,7 +153,9 @@ r.patch(
   }),
 )
 
-// POST /users/me/avatar — multipart field `avatar` OR JSON { imageBase64 }
+// POST /users/me/avatar — multipart field `avatar` OR JSON { imageBase64 }.
+// Caps: 2 MB raw upload; stored data URL ≤ ~2.8 MB base64; image/* MIME only.
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024
 r.post(
   '/me/avatar',
   rawBody,
@@ -163,20 +165,37 @@ r.post(
     if (ct.includes('multipart/form-data')) {
       const buf: Buffer = (req as any).rawBody
       if (!buf || !buf.length) throw new ApiError(400, 'Empty multipart body')
+      if (buf.length > AVATAR_MAX_BYTES + 64 * 1024) {
+        throw new ApiError(413, 'Avatar too large — maximum is 2 MB', 'PAYLOAD_TOO_LARGE')
+      }
       const form = await new Response(buf, { headers: { 'content-type': ct } }).formData()
       const file = form.get('avatar')
       if (!file || typeof file === 'string') {
         throw verr([vd('avatar', 'avatar file field is required')])
       }
+      const mime = (file as File).type || 'image/jpeg'
+      if (!mime.startsWith('image/')) {
+        throw verr([vd('avatar', 'avatar must be an image')])
+      }
       const ab = await (file as File).arrayBuffer()
+      if (ab.byteLength > AVATAR_MAX_BYTES) {
+        throw new ApiError(413, 'Avatar too large — maximum is 2 MB', 'PAYLOAD_TOO_LARGE')
+      }
       const b64 = Buffer.from(ab).toString('base64')
-      dataUrl = `data:${(file as File).type || 'image/jpeg'};base64,${b64}`
+      dataUrl = `data:${mime};base64,${b64}`
     } else {
       const img = req.body?.imageBase64
       if (!img || typeof img !== 'string') {
         throw verr([vd('imageBase64', 'imageBase64 (JSON) or multipart avatar field is required')])
       }
-      dataUrl = (img as string).startsWith('data:') ? (img as string) : `data:image/jpeg;base64,${img}`
+      if (img.length > Math.ceil(AVATAR_MAX_BYTES * 4 / 3) + 128) {
+        throw new ApiError(413, 'Avatar too large — maximum is 2 MB', 'PAYLOAD_TOO_LARGE')
+      }
+      const raw = (img as string).startsWith('data:') ? (img as string) : `data:image/jpeg;base64,${img}`
+      if (!/^data:image\//.test(raw)) {
+        throw verr([vd('imageBase64', 'avatar must be an image data URL')])
+      }
+      dataUrl = raw
     }
     run('UPDATE users SET avatar = ? WHERE id = ?', dataUrl, req.user.id)
     res.json({ success: true, data: { avatarUrl: dataUrl } })

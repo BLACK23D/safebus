@@ -23,6 +23,21 @@ const AUTH_PATHS =
 
 const MUTATING = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
 
+/** Upstream timeout: a hung backend must not tie up the request forever (issue #11). */
+const UPSTREAM_TIMEOUT_MS = 10_000;
+
+/** Clean envelope when the backend is unreachable or times out (no raw 500s). */
+function backendUnavailable(): NextResponse {
+  return NextResponse.json(
+    {
+      success: false,
+      message: 'The service is temporarily unavailable — please try again in a moment.',
+      error: { message: 'Backend unavailable', code: 'BACKEND_UNAVAILABLE' },
+    },
+    { status: 502, headers: { 'cache-control': 'no-store' } },
+  );
+}
+
 function sameOrigin(req: NextRequest): boolean {
   if (!MUTATING.has(req.method)) return true;
   const site = req.headers.get('sec-fetch-site');
@@ -73,6 +88,7 @@ function refreshOnce(refreshToken: string): Promise<RefreshResult> {
         cache: 'no-store',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       });
       if (!r.ok) return null;
       const json = await r.json();
@@ -109,7 +125,13 @@ async function forward(
     if (v) headers.set(h, v);
   }
   if (accessToken) headers.set('authorization', `Bearer ${accessToken}`);
-  return fetch(url, { method: req.method, headers, body, cache: 'no-store' });
+  return fetch(url, {
+    method: req.method,
+    headers,
+    body,
+    cache: 'no-store',
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+  });
 }
 
 async function handle(req: NextRequest, ctx: { params: Promise<{ path?: string[] }> }) {
@@ -167,7 +189,12 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path?: string[]
     if (rt) body = JSON.stringify({ refreshToken: rt });
   }
 
-  let upstream = await forward(req, joined, at, body);
+  let upstream: Response;
+  try {
+    upstream = await forward(req, joined, at, body);
+  } catch {
+    return backendUnavailable();
+  }
 
   // Single retry through a refreshed token on 401 (never for the refresh call itself).
   if (upstream.status === 401 && !/^auth\/(refresh|logout)/.test(joined)) {
@@ -176,7 +203,11 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path?: string[]
       const refreshed = await refreshOnce(rt);
       if (refreshed?.tokens) {
         at = refreshed.tokens.accessToken;
-        upstream = await forward(req, joined, at, body);
+        try {
+          upstream = await forward(req, joined, at, body);
+        } catch {
+          return backendUnavailable();
+        }
         if (upstream.ok) {
           const res = new NextResponse(upstream.body, {
             status: upstream.status,

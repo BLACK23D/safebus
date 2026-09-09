@@ -2,7 +2,7 @@ import express, { type Express } from 'express'
 import cors from 'cors'
 import { createServer } from 'http'
 import { Server as SocketServer } from 'socket.io'
-import { initDb } from './lib/db'
+import { closeDb, initDb, purgeOldLocations, LOCATION_RETENTION_DAYS } from './lib/db'
 import { errorHandler, notFoundHandler } from './lib/errors'
 import { setIo, setupSocket } from './lib/sockets'
 import { runSeed } from './seed'
@@ -35,7 +35,7 @@ export function createApp(): Express {
   // capture raw body for multipart avatar handling; JSON bodies also keep rawBody
   app.use(
     express.json({
-      limit: '15mb',
+      limit: '1mb',
       verify: (req: any, _res, buf) => {
         req.rawBody = buf
       },
@@ -69,6 +69,16 @@ export function createApp(): Express {
 function main() {
   initDb()
   runSeed()
+  const purged = purgeOldLocations()
+  if (purged > 0) console.log(`[safebus-backend] locations retention: purged ${purged} rows (>${LOCATION_RETENTION_DAYS}d)`)
+  // Retention job: keep the only unbounded table bounded.
+  setInterval(() => {
+    try {
+      purgeOldLocations()
+    } catch (e) {
+      console.error('[safebus-backend] retention job failed:', e)
+    }
+  }, 6 * 3600 * 1000).unref()
 
   const app = createApp()
   const httpServer = createServer(app)
@@ -83,6 +93,34 @@ function main() {
   httpServer.listen(PORT, () => {
     console.log(`[safebus-backend] listening on http://localhost:${PORT} (REST + Socket.IO)`)
   })
+
+  // Graceful shutdown: stop accepting → close realtime → checkpoint WAL → close DB.
+  let shuttingDown = false
+  const shutdown = (signal: string) => {
+    if (shuttingDown) return
+    shuttingDown = true
+    console.log(`[safebus-backend] ${signal} received — shutting down`)
+    io.close(() => {
+      httpServer.close(() => {
+        try {
+          closeDb()
+        } finally {
+          process.exit(0)
+        }
+      })
+    })
+    // Hard exit if graceful close hangs (pending keep-alive sockets etc.).
+    setTimeout(() => {
+      console.warn('[safebus-backend] graceful close timed out — forcing exit')
+      try {
+        closeDb()
+      } finally {
+        process.exit(0)
+      }
+    }, 5_000).unref()
+  }
+  process.on('SIGTERM', () => shutdown('SIGTERM'))
+  process.on('SIGINT', () => shutdown('SIGINT'))
 }
 
 main()

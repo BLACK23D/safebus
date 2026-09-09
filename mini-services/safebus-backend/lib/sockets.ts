@@ -79,6 +79,10 @@ export function setupSocket(ioServer: Server) {
         String(socket.handshake.headers?.authorization || '').replace(/^Bearer\s+/i, '')
       if (!token) return next(new Error('Unauthorized'))
       const payload = jwt.verify(token, JWT_SECRET) as any
+      // Accept socket-scoped tokens (scope:'socket', 60s TTL) and, for backward
+      // compatibility, unscoped access tokens. REST routes reject socket-scoped
+      // tokens, so a handshake token can never double as an API credential.
+      if (payload?.scope && payload.scope !== 'socket') return next(new Error('Unauthorized'))
       const user = one('SELECT * FROM users WHERE id = ?', payload?.sub)
       if (!user || user.status !== 'active') return next(new Error('Unauthorized'))
       socket.data.userId = user.id
@@ -102,8 +106,29 @@ export function setupSocket(ioServer: Server) {
       socket.join(`school:${schoolId}`)
     }
 
+    // Revocation re-check: suspended/deactivated users are disconnected within
+    // 5 minutes instead of living until their next reconnect.
+    const statusCheck = setInterval(() => {
+      try {
+        const u = one('SELECT status FROM users WHERE id = ?', userId)
+        if (!u || u.status !== 'active') {
+          console.log(`[socket] disconnecting non-active user ${userId}`)
+          socket.disconnect(true)
+        }
+      } catch {
+        /* transient db error — next interval retries */
+      }
+    }, 5 * 60_000)
+    socket.on('disconnect', () => clearInterval(statusCheck))
+
     socket.on('trip:join', (arg: { tripId?: string } | undefined) => {
       try {
+        // Cheap per-join authorization refresh: status may have changed since connect.
+        const me = one('SELECT status FROM users WHERE id = ?', userId)
+        if (!me || me.status !== 'active') {
+          socket.disconnect(true)
+          return
+        }
         const tripId = arg?.tripId
         if (!tripId) return
         const trip = one('SELECT * FROM trips WHERE id = ?', tripId)

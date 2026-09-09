@@ -130,6 +130,7 @@ r.post(
     const details = []
     if (!recipientId) details.push(vd('recipientId', 'recipientId is required'))
     if (!body || !String(body).trim()) details.push(vd('body', 'body is required'))
+    if (String(body ?? '').length > 4000) details.push(vd('body', 'Message must be at most 4000 characters'))
     if (details.length) throw verr(details)
     const peer = one('SELECT * FROM users WHERE id = ?', String(recipientId))
     if (!peer) throw new ApiError(404, 'Recipient not found')
