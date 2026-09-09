@@ -78,3 +78,5 @@ backend-dev.log
 # sandbox scratch
 /tmp/
 iframe-test/
+# sandbox agent tool dumps
+tool-results/

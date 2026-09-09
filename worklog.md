@@ -403,3 +403,25 @@ Work Log:
 
 Stage Summary:
 - Everything compiled and green: lint 0, tsc 0 (app scope), all 33 routes warm-compiled and serving, PWA fully operational on the dev server (:3000 via gateway :81) — SW v2 activated, manifest/icons valid, offline page precached, update-banner consent flow intact. App is installable from the https preview (browser menu → Install/Add to Home Screen). Production build intentionally not run per sandbox constraint (dev server is the live preview).
+
+---
+Task ID: 10.1
+Agent: orchestrator (main) + 5 audit subagents
+Task: Full production-readiness audit (backend, frontend/UI, security, PWA/perf, repo/docs/history) requested by product owner; publish repo to GitHub and track all findings as issues + PRs.
+
+Work Log:
+- Repo hygiene: untracked .env, db/custom.db, mini-services data.db*, dev.log.prev, .zscripts/dev.pid; hardened .gitignore; added .env.example; removed junk download/; repo-local identity set to Denis Kelvin Murithi <BLACK23D@users.noreply.github.com>; published public repo github.com/BLACK23D/safebus (commit b87e9fc).
+- Installed gh CLI v2.100.0 (user-binary); bound owner PAT (scopes: repo, workflow — sufficient; read:org absent so GH_TOKEN env mode used, not `gh auth login`).
+- Launched 5 parallel read-only audit agents (backend / frontend / security / PWA / repo-docs). Consolidated findings below; all located with file:line citations.
+
+Findings (triaged):
+- BLOCKER BE-1: BFF single-flight refresh not keyed by refresh token (src/app/api/[...path]/route.ts) → cross-account session mixing risk.
+- BLOCKER BE-2/SEC-1: hardcoded JWT_SECRET (mini-services/safebus-backend/lib/auth.ts:7) → token forgery; fix = env + fail-fast in production.
+- BLOCKER FE-2: demo credentials incl. superadmin hardcoded in login client bundle (login-form.tsx) → gate behind NEXT_PUBLIC_DEMO_MODE.
+- BLOCKER DOC-1: .env/DB blobs persist in published git history → filter-branch rewrite + force-push now (10 commits, zero collaborators).
+- MAJOR: SEC-2 school-room socket broadcast leaks studentName + all bus positions cross-family; SEC-4 logout/password-reset never revokes refresh tokens; SEC-5/BE-4 rate limiter keyed on req.ip behind proxy (one global bucket) + unthrottled claim-invite/refresh; SEC-6 first-party Secure flag from env not x-forwarded-proto; SEC-7 reset/verify tokens logged; SEC-8 login account-enumeration timing; SEC-9 zero security headers (CSP/HSTS/XCTO/Referrer-Policy); SEC-10 15mb JSON + no BFF fetch timeouts; BE-5 backend-down → raw 500; BE-6 refresh rotation race + no family revocation; BE-7 no graceful shutdown; BE-8 zero DB indexes + unbounded locations growth + in-memory pagination in admin lists; BE-9 socket-token = full 15-min API credential (not scoped/one-time); FE-1 no loading.tsx/Suspense on RSC routes; FE-3 student 404-masks backend outages; FE-4 offline ribbon overlays mobile header; PWA-1 subresource offline fallback returns HTML; PWA-2 offline shell never revalidated after deploys; PWA-4 next.config ignoreBuildErrors=true + poweredByHeader + strictMode; DOC-2 UUID commit messages; DOC-3 tool-results/ published; DOC-4/5/9 missing README/LICENSE/CI/ADRs + wrong package name; PWA-3 TanStack Query declared but unused (hand-rolled fetch hooks).
+- MINOR (selected): BE-10 static pickup codes never expire/enforced; BE-11 secrets-in-logs, 15mb body, unvalidated avatar; BE-12 dead Prisma scaffold + /api hello route; FE-5 no client-side zod/RHF on auth forms; FE-6/7 uncontained stop lists + sub-44px touch targets; FE-8 role=application on map; FE-11 no footer; PWA-5 cache writes unguarded + not in waitUntil; PWA-6 first-install auto-reload; PWA-7 dismiss not persisted; PWA-9 recharts static import; PWA-10 unused heavy deps; PWA-11 framer-motion on auth pages; PWA-12 favicon wiring; SEC-12 password policy (cost 10, no max length); SEC-13 socket lifetime vs revocation; DOC-6/7/8/10/12 docs/reorg items.
+
+Stage Summary:
+- Audit complete: 4 launch blockers, ~15 majors, ~20 minors, all cited. Strengths confirmed by all agents: server-side object-level authorization (no IDOR), token-stripping BFF, parameterized SQL everywhere, serializer discipline for pickup codes, privacy-strict SW v2, role-aware manifest shortcuts, socket trip:join server-validated.
+- Next: publish all findings as labeled GitHub issues; fix via PRs per bounded area (foundation → security → backend → UI → PWA), each PR closing its issues; final production-readiness QA report + browser E2E regression.
