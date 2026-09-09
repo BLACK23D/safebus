@@ -46,7 +46,7 @@ login). Opt out with `AUTH_COOKIE_EMBEDDED=0`:
 |---|---|---|---|
 | POST | `/auth/login` | `{ email, password, role? }` (role accepted, informational only) | `{ accessToken, refreshToken, user }` |
 | POST | `/auth/register` | `{ name, email, phone, password, role: "parent" }` | `{ user }` (auto-verified in sandbox; see note) |
-| POST | `/auth/refresh` | `{ refreshToken }` | fresh `{ accessToken, refreshToken }` (rotation; reuse of old token → 401) |
+| POST | `/auth/refresh` | `{ refreshToken }` | fresh `{ accessToken, refreshToken }` (rotation). Reuse of a consumed token: within a 90 s grace window → plain 401 (benign concurrent-refresh race); afterwards → 401 AND the user's whole refresh family is revoked (theft response). Replaying a revoked token revokes the family immediately. |
 | POST | `/auth/logout` | `{ refreshToken? }` | `{ ok: true }` |
 | GET | `/auth/me` | — | `user` |
 | POST | `/auth/forgot-password` | `{ email }` | `{ ok: true }` (always) |
@@ -178,7 +178,7 @@ Child-status transitions emitted via `student:status`: `waiting → picked_up �
 ## 13. Socket.IO — V (authoritative event set)
 
 - Namespace `/`; handshake `auth: { token: <accessToken> }` (JWT access token). Invalid → `connect_error`.
-- Auto-rooms: `user:{id}`, `school:{id}`, and `trip:{id}` on `trip:join`.
+- Auto-rooms: `user:{id}` always; `school:{id}` **staff-only** (admin / superadmin / driver — parents are excluded so school-wide broadcasts never disclose other families' children); `trip:{id}` on `trip:join`.
 - Client → server:
   - `trip:join { tripId }` — authorized: driver of trip, parent of a child on trip, admin of school.
 - Server → client (exact names + payload shapes):
@@ -199,6 +199,6 @@ Child-status transitions emitted via `student:status`: `waiting → picked_up �
 ## 14. BFF behavior (transparent to this contract) — V
 
 - Login/register/refresh/claim-invite response bodies are token-stripped before reaching the browser (`accessToken`/`refreshToken` removed; `user` remains).
-- 401 from upstream triggers single-flight refresh + one retry; on failure browser is redirected to `/login?session=expired`.
+- 401 from upstream triggers keyed single-flight refresh (per refresh token) + one retry; explicit `/api/auth/refresh` POSTs are intercepted into the same single-flight. Logout injects `sb_rt` from its cookie so the backend revokes it server-side.
 - Mutating methods require same-origin `Origin`/`Sec-Fetch-Site` (CSRF guard).
 - `GET /api/socket-token` → `{ token }` (short-lived access token for the socket handshake only).

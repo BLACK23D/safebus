@@ -6,6 +6,17 @@ export const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000
 export const IS_SECURE = APP_URL.startsWith('https');
 
 /**
+ * Per-request secure derivation: an HTTPS deployment that forgets to set
+ * NEXT_PUBLIC_APP_URL must still get Secure cookies (issue #6 / SEC-6). Trust the
+ * first `x-forwarded-proto` entry when present, falling back to the configured URL.
+ */
+export function requestIsSecure(headers: Headers): boolean {
+  const proto = headers.get('x-forwarded-proto');
+  if (proto) return proto.split(',')[0].trim() === 'https';
+  return IS_SECURE;
+}
+
+/**
  * Embedded (iframe) deployments — e.g. the preview panel hosting the app cross-site —
  * cannot set SameSite=Lax/Strict cookies: browsers drop them in third-party contexts,
  * so login "succeeds" but the session never sticks. In embedded mode the auth cookie

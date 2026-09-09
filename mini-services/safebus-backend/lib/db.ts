@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
   used INTEGER NOT NULL DEFAULT 0,
   revoked INTEGER NOT NULL DEFAULT 0,
   expiresAt TEXT NOT NULL,
-  createdAt TEXT NOT NULL
+  createdAt TEXT NOT NULL,
+  usedAt TEXT
 );
 CREATE TABLE IF NOT EXISTS students (
   id TEXT PRIMARY KEY,
@@ -197,6 +198,12 @@ export function initDb(): Database {
   db = new Database(DB_PATH)
   db.exec('PRAGMA journal_mode = WAL;')
   db.exec(SCHEMA)
+  // Migration for databases created before the usedAt column existed (refresh reuse detection).
+  try {
+    db.exec('ALTER TABLE refresh_tokens ADD COLUMN usedAt TEXT')
+  } catch {
+    /* column already exists */
+  }
   return db
 }
 

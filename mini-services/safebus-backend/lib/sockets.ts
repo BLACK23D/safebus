@@ -93,7 +93,14 @@ export function setupSocket(ioServer: Server) {
   ioServer.on('connection', (socket: Socket) => {
     const { userId, role, schoolId } = socket.data as { userId: string; role: string; schoolId: string | null }
     socket.join(`user:${userId}`)
-    if (schoolId) socket.join(`school:${schoolId}`)
+    // School room is STAFF-ONLY (admin/superadmin/driver). Parents are excluded so
+    // school-wide broadcasts (bus positions, attendance events) can never leak
+    // other families' children to a parent socket — parents receive everything
+    // they are entitled to via `trip:<id>` rooms (server-validated trip:join) and
+    // their own `user:<id>` room.
+    if (schoolId && (role === 'admin' || role === 'superadmin' || role === 'driver')) {
+      socket.join(`school:${schoolId}`)
+    }
 
     socket.on('trip:join', (arg: { tripId?: string } | undefined) => {
       try {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { BACKEND_URL, IS_SECURE } from '@/lib/env';
+import { BACKEND_URL, requestIsSecure } from '@/lib/env';
 import { ROLE_HOME, canAccess } from '@/lib/auth/access';
 import {
   COOKIES,
@@ -28,8 +28,8 @@ const PUBLIC = [
   /^\/offline/,
 ];
 
-function setCookies(res: NextResponse, t: Tokens, s: AppSession | null) {
-  applySessionCookies(res, t, s, IS_SECURE);
+function setCookies(res: NextResponse, t: Tokens, s: AppSession | null, req: NextRequest) {
+  applySessionCookies(res, t, s, requestIsSecure(req.headers));
 }
 
 export async function middleware(req: NextRequest) {
@@ -56,7 +56,7 @@ export async function middleware(req: NextRequest) {
             req.cookies.set(COOKIES.at, t.accessToken);
             if (t.refreshToken) req.cookies.set(COOKIES.rt, t.refreshToken);
             res = NextResponse.next({ request: { headers: req.headers } });
-            setCookies(res, t, session);
+            setCookies(res, t, session, req);
           }
         } else {
           session = null;

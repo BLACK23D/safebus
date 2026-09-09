@@ -3,7 +3,9 @@ import { one, run } from '../lib/db'
 import { ApiError, checkPassword, newId, nowIso, vd, verr, h } from '../lib/util'
 import {
   authTokens,
+  clientIp,
   comparePassword,
+  dummyPasswordHash,
   hashPassword,
   rateLimit,
   requireAuth,
@@ -13,6 +15,18 @@ import { pubUser } from '../lib/serialize'
 
 const r = Router()
 const authLimiter = rateLimit({ windowMs: 60_000, max: 10, bucket: 'auth' })
+// Login is keyed per account+IP: one victim's bucket can no longer be filled by
+// an attacker spraying from a different IP (global-bucket login DoS fixed).
+const loginLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 10,
+  bucket: 'login',
+  key: (req) => `${clientIp(req)}:${String(req.body?.email ?? '').trim().toLowerCase()}`,
+})
+const refreshLimiter = rateLimit({ windowMs: 60_000, max: 60, bucket: 'refresh' })
+const inviteLimiter = rateLimit({ windowMs: 60_000, max: 10, bucket: 'invite' })
+const verifyLimiter = rateLimit({ windowMs: 60_000, max: 10, bucket: 'verify' })
+const isProd = process.env.NODE_ENV === 'production'
 
 function findUserByEmail(email: unknown): Row | undefined {
   return one('SELECT * FROM users WHERE email = ?', String(email ?? '').trim().toLowerCase())
@@ -30,7 +44,7 @@ function assertLoginAllowed(user: Row) {
 // POST /auth/login
 r.post(
   '/login',
-  authLimiter,
+  loginLimiter,
   h((req, res) => {
     const b = req.body || {}
     if (b.role) console.log(`[auth] login role hint: ${b.role} (informational only)`)
@@ -39,7 +53,10 @@ r.post(
     if (!b.password) details.push(vd('password', 'Password is required'))
     if (details.length) throw verr(details)
     const user = findUserByEmail(b.email)
-    if (!user || !comparePassword(String(b.password), user.passwordHash)) {
+    // Timing equalization: unknown emails still pay one bcrypt compare so login
+    // latency cannot be used to enumerate registered accounts.
+    if (!user || !comparePassword(String(b.password), user.passwordHash || dummyPasswordHash())) {
+      if (!user) dummyPasswordHash()
       throw new ApiError(401, 'Invalid credentials')
     }
     assertLoginAllowed(user)
@@ -82,14 +99,33 @@ r.post(
   }),
 )
 
-// POST /auth/refresh — rotation with reuse detection
+// POST /auth/refresh — rotation with reuse detection.
+// Benign concurrent refreshes (BFF single-flight loser, middleware race) present a
+// just-rotated token within a short grace window → plain 401, family untouched.
+// A later replay of a consumed/revoked token is treated as theft: the whole family
+// is revoked (OWASP refresh-token rotation guidance).
+const REUSE_GRACE_MS = 90_000
 r.post(
   '/refresh',
+  refreshLimiter,
   h((req, res) => {
     const { refreshToken } = req.body || {}
     if (!refreshToken) throw new ApiError(401, 'Refresh token required', 'UNAUTHORIZED')
     const row = one('SELECT * FROM refresh_tokens WHERE token = ?', String(refreshToken))
-    if (!row || row.used || row.revoked) {
+    if (!row) throw new ApiError(401, 'Invalid refresh token', 'UNAUTHORIZED')
+    if (row.revoked) {
+      run('UPDATE refresh_tokens SET revoked = 1 WHERE userId = ? AND revoked = 0', row.userId)
+      console.warn(`[auth] revoked-token replay for user ${row.userId} — family revoked`)
+      throw new ApiError(401, 'Invalid refresh token', 'UNAUTHORIZED')
+    }
+    if (row.used) {
+      const usedAt = row.usedAt ? new Date(row.usedAt).getTime() : 0
+      if (usedAt && Date.now() - usedAt < REUSE_GRACE_MS) {
+        // Benign race: the session continues via whichever caller won the rotation.
+        throw new ApiError(401, 'Invalid refresh token', 'UNAUTHORIZED')
+      }
+      run('UPDATE refresh_tokens SET revoked = 1 WHERE userId = ? AND revoked = 0', row.userId)
+      console.warn(`[auth] refresh reuse detected for user ${row.userId} — family revoked`)
       throw new ApiError(401, 'Invalid refresh token', 'UNAUTHORIZED')
     }
     if (row.expiresAt && new Date(row.expiresAt).getTime() < Date.now()) {
@@ -98,7 +134,7 @@ r.post(
     const user = one('SELECT * FROM users WHERE id = ?', row.userId)
     if (!user) throw new ApiError(401, 'Invalid refresh token', 'UNAUTHORIZED')
     assertLoginAllowed(user)
-    run('UPDATE refresh_tokens SET used = 1 WHERE id = ?', row.id) // rotate
+    run('UPDATE refresh_tokens SET used = 1, usedAt = ? WHERE id = ?', nowIso(), row.id) // rotate
     res.json({ success: true, data: authTokens(user) })
   }),
 )
@@ -139,7 +175,7 @@ r.post(
         new Date(Date.now() + 3600_000).toISOString(),
         user.id,
       )
-      console.log(`[auth] reset token issued for ${user.email}: ${token}`)
+      if (!isProd) console.log(`[auth] reset token issued for ${user.email}: ${token}`)
     }
     res.json({ success: true, data: { ok: true } })
   }),
@@ -160,6 +196,8 @@ r.post(
       hashPassword(String(req.body.password)),
       user.id,
     )
+    // A password reset invalidates every live session for the account.
+    run('UPDATE refresh_tokens SET revoked = 1 WHERE userId = ? AND revoked = 0', user.id)
     res.json({ success: true, data: { ok: true } })
   }),
 )
@@ -167,6 +205,7 @@ r.post(
 // POST /auth/verify-email
 r.post(
   '/verify-email',
+  verifyLimiter,
   h((req, res) => {
     const { token } = req.body || {}
     const user = token ? one('SELECT * FROM users WHERE verificationToken = ?', String(token)) : undefined
@@ -180,10 +219,11 @@ r.post(
 r.post(
   '/resend-verification',
   requireAuth,
+  verifyLimiter,
   h((req, res) => {
     const token = newId() + newId()
     run('UPDATE users SET verificationToken = ? WHERE id = ?', token, req.user.id)
-    console.log(`[auth] verification token issued for ${req.user.email}: ${token}`)
+    if (!isProd) console.log(`[auth] verification token issued for ${req.user.email}: ${token}`)
     res.json({ success: true, data: { ok: true } })
   }),
 )
@@ -191,6 +231,7 @@ r.post(
 // POST /auth/claim-invite
 r.post(
   '/claim-invite',
+  inviteLimiter,
   h((req, res) => {
     const b = req.body || {}
     if (!b.token) throw verr([vd('token', 'Invite token is required')])

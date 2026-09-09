@@ -62,6 +62,7 @@ export const newInviteToken = (): string => 'INV-' + randomBytes(6).toString('he
 export function validatePasswordRules(pw: unknown): string[] {
   const issues: string[] = []
   if (typeof pw !== 'string' || pw.length < 8) issues.push('Password must be at least 8 characters')
+  if (typeof pw === 'string' && pw.length > 128) issues.push('Password must be at most 128 characters')
   if (typeof pw !== 'string' || !/[A-Z]/.test(pw)) issues.push('Password must contain an uppercase letter')
   if (typeof pw !== 'string' || !/[a-z]/.test(pw)) issues.push('Password must contain a lowercase letter')
   if (typeof pw !== 'string' || !/[0-9]/.test(pw)) issues.push('Password must contain a number')
