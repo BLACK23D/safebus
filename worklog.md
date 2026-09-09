@@ -425,3 +425,85 @@ Findings (triaged):
 Stage Summary:
 - Audit complete: 4 launch blockers, ~15 majors, ~20 minors, all cited. Strengths confirmed by all agents: server-side object-level authorization (no IDOR), token-stripping BFF, parameterized SQL everywhere, serializer discipline for pickup codes, privacy-strict SW v2, role-aware manifest shortcuts, socket trip:join server-validated.
 - Next: publish all findings as labeled GitHub issues; fix via PRs per bounded area (foundation → security → backend → UI → PWA), each PR closing its issues; final production-readiness QA report + browser E2E regression.
+
+---
+Task ID: 10.2
+Agent: orchestrator (main)
+Task: Publish to GitHub, purge history, create issue tracker.
+
+Work Log:
+- Bound owner PAT (scopes repo+workflow; GH_TOKEN env mode since read:org absent), installed gh v2.100.0 user-binary.
+- Published public repo github.com/BLACK23D/safebus (commit 94f8630 → history-rewritten 52b17b5).
+- git filter-branch purge of .env / db files / dev.log.prev / .zscripts/dev.pid / tool-results across all history + force-push; verified `git log --all -- .env` empty (closes DOC-1/issue #4).
+- Created 9 labels + 24 issues (#1–#24) covering every audit finding, severity/area labeled, each with evidence + fix + acceptance criteria.
+
+Stage Summary:
+- Issue tracker = single source of truth for the fix waves; history clean before any further work landed.
+
+---
+Task ID: 10.3
+Agent: orchestrator (main)
+Task: PR #25 — repo foundation (closes #4 #23 #24).
+
+Work Log:
+- README.md (pitch/mermaid architecture/quickstart/demo matrix/quality links/repo map/roadmap), MIT LICENSE, CI workflow (bun install → eslint → tsc → backend syntax gate), CONTRIBUTING, SECURITY, CODEOWNERS, issue templates.
+- docs/adr/0001–0005 (CHIPS cookies, BFF token containment, SW privacy, Bun/SQLite backend, seed strategy); docs/HISTORY.md commit↔worklog map; docs/README.md index.
+- Reorg: agent-ctx → docs/history (8-pwa-layer superseded note + mojibake fix); tests → scripts/platform-tests (relative paths fixed); .gitignore anchors; /upload/ ignored.
+- Squash-merged; CI green. Note: platform auto-checkout moved HEAD to main mid-flow twice — handled by explicit `git branch -f <branch> HEAD` + named-ref pushes.
+
+---
+Task ID: 10.4
+Agent: orchestrator (main)
+Task: PR #26 — security core (closes #1 #2 #5 #6 #7 #9 #10).
+
+Work Log:
+- Backend: JWT secret env + prod fail-fast; refresh reuse detection (usedAt column + 90s grace window; family revocation on replay); login limiter per account+IP + limiters on refresh/claim-invite/verify; clientIp() rightmost-XFF; dummy-bcrypt login timing equalization; password max 128 + bcrypt cost 12; reset/verify token logs prod-gated; reset revokes all sessions; ALLOWED_ORIGIN CORS; school socket room staff-only (cross-family child-data leak closed).
+- BFF: keyed single-flight refresh (cross-account mixing fixed); explicit /api/auth/refresh intercepted into same flight; logout injects sb_rt (real server-side revocation); Secure from x-forwarded-proto.
+- CONTRACTS.md §1/§13/§14 updated in-PR. curl-verified: login → keyed refresh → grace 401 → family alive → logout → replay 401. Browser: parent/driver/admin all clean.
+
+---
+Task ID: 10.5
+Agent: orchestrator (main)
+Task: PR #27 — backend reliability + config (closes #8 #11 #12 #13 #14 #15).
+
+Work Log:
+- BFF 10s timeouts + 502 BACKEND_UNAVAILABLE envelope (live-verified with backend stopped); serverApi timeout.
+- Graceful shutdown (SIGTERM/SIGINT → io → server → wal_checkpoint(TRUNCATE) → db.close, 5s force guard); 12 hot-FK indexes at boot; locations retention (7d, boot + 6h unref interval); trip list LIMIT 5000; JSON 15mb→1mb.
+- Socket tokens: /auth/socket-token 60s scope:'socket' JWT; requireAuth rejects scope tokens on REST; handshake accepts; suspended users disconnected ≤5min (interval + per-join check). Live-verified: REST 401 / socket connected.
+- Pickup codes: per-trip rotation at start (attendance.code/codeIssuedAt columns + migrations), sliding 30s window enforced at verify, 409 on non-active trips, legacy rows adopted.
+- Avatar 2MB + image MIME validation; messages 4000 chars. next.config: security headers (CSP frame-ancestors/nosniff/Referrer-Policy/HSTS), ignoreBuildErrors:false, StrictMode on, poweredByHeader off.
+- Removed dead Prisma scaffold + /api hello route; package renamed safebus-web 1.0.0; bun.lock regenerated. Fixed JWT_SECRET import miss caught by live 500 → log → fix.
+
+---
+Task ID: 10.6
+Agent: orchestrator (main)
+Task: PR #28 — UI polish (closes #3 #16 #17 #18 #19).
+
+Work Log:
+- Demo credentials gated behind NEXT_PUBLIC_DEMO_MODE=1 (sandbox .env sets it; production bundles clean).
+- (app)/loading.tsx PageSkeleton for all authenticated RSC routes; students/[id] 404-vs-error honesty (ErrorState on outages).
+- Offline ribbon stacks below mobile bar (top-14/z-30, spacer hack removed); stop lists scroll-contained (max-h-96 + scrollbar-thin); map role=img; 44px touch targets across edit-requests/notifications/attendance/emergency/profile.
+- (public) footer (privacy/issues/support) with min-h-dvh flex sticky skeleton + safe-area padding.
+
+---
+Task ID: 10.7
+Agent: orchestrator (main)
+Task: PR #29 — PWA hardening (closes #20 #21 #22).
+
+Work Log:
+- sw.js v3: subresource misses → 504 (offline HTML navigations-only); precache revalidated on activate (cache:'reload'); cache writes ok/basic-guarded + e.waitUntil; register-sw first-install reload guard (hadController) + 2h dismissal persistence.
+- Admin charts extracted to dashboard-charts.tsx via next/dynamic (recharts off critical path) + chart-colors.ts shared palette; framer-motion removed from auth (CSS keyframe pill) and dropped as a dependency; 14 never-imported deps pruned; favicon.ico + 32px metadata icon.
+- Live: SW v3 controlling (shell-v3/assets-v3), no first-install reload, parent /track Live + B-101 clean, favicon 200.
+
+---
+Task ID: 10.8
+Agent: orchestrator (main)
+Task: Final QA report + release tag.
+
+Work Log:
+- CI green on all merged waves; 24/24 issues closed, 0 open.
+- docs/QA-REPORT-PROD-READINESS.md: verification matrix, blocker evidence, security posture, production deployment checklist (§5), honest limitations (no committed test suite per sandbox policy; next build not run in sandbox — CI/tsc validate compile path).
+- Final browser E2E + v1.0.0 tag on main.
+
+Stage Summary:
+- Platform ready for customer onboarding in sandbox/demo; production gate = §5 checklist.
