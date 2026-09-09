@@ -5,7 +5,7 @@ import type { Metadata } from 'next';
 import { listOf, serverApi } from '@/lib/api/server';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyState, StatusBadge } from '@/components/ui/kit';
+import { EmptyState, ErrorState, StatusBadge } from '@/components/ui/kit';
 
 export const metadata: Metadata = { title: 'Student profile' };
 
@@ -72,12 +72,37 @@ function InfoTile({
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const [student, attendanceRes] = await Promise.all([
-    serverApi<StudentDetail>(`/students/${id}`),
-    serverApi<{ items?: AttendanceRow[] }>('/attendance', { studentId: id, limit: 20 }),
-  ]).catch(() => [null, null] as const);
+  // Distinguish "unknown student" (404) from transient backend failures —
+  // an outage must render a retryable error state, not a misleading 404 (#17).
+  let student: StudentDetail | null = null;
+  let attendanceRes: { items?: AttendanceRow[] } | null = null;
+  let errorMessage: string | null = null;
+  try {
+    [student, attendanceRes] = await Promise.all([
+      serverApi<StudentDetail>(`/students/${id}`),
+      serverApi<{ items?: AttendanceRow[] }>('/attendance', { studentId: id, limit: 20 }),
+    ]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Could not load this student.';
+    if (/not found|\b404\b/i.test(msg)) notFound(); // unknown id → 404 page
+    errorMessage = msg;
+  }
 
-  if (!student) notFound();
+  if (!student) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <Link
+            href="/students"
+            className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to students
+          </Link>
+        </div>
+        <ErrorState message={errorMessage ?? 'Could not load this student.'} />
+      </div>
+    );
+  }
   const attendance = listOf<AttendanceRow>(attendanceRes);
 
   return (

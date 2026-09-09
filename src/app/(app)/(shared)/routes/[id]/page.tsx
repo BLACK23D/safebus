@@ -112,7 +112,7 @@ export default async function RouteDetailPage({ params }: { params: Promise<{ id
               No stops have been added to this route yet.
             </p>
           ) : (
-            <ol className="space-y-2">
+            <ol className="max-h-96 space-y-2 overflow-y-auto pr-1 scrollbar-thin">
               {stops.map((s, i) => (
                 <li
                   key={s.id}

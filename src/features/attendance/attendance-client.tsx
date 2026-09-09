@@ -346,7 +346,7 @@ export function AttendanceClient({ session }: { session: AppSession }) {
               <Button
                 variant="outline"
                 size="sm"
-                className="min-h-10"
+                className="min-h-11"
                 disabled={data.page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
@@ -358,7 +358,7 @@ export function AttendanceClient({ session }: { session: AppSession }) {
               <Button
                 variant="outline"
                 size="sm"
-                className="min-h-10"
+                className="min-h-11"
                 disabled={data.page >= data.pages}
                 onClick={() => setPage((p) => p + 1)}
               >
