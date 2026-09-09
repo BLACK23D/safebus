@@ -3,20 +3,6 @@
 import * as React from 'react';
 import { Bus, BusFront, Navigation, RefreshCw, Siren, UserRound } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import { http } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -38,6 +24,20 @@ const LiveMap = dynamic(() => import('@/components/map/live-map').then((m) => m.
   ssr: false,
   loading: () => <Skeleton className="h-72 w-full rounded-2xl" aria-label="Loading map" />,
 });
+
+/** recharts is heavy (~100KB gz) — charts load lazily, mirroring the LiveMap pattern. */
+const FleetStatusChart = dynamic(
+  () => import('@/features/admin/dashboard-charts').then((m) => m.FleetStatusChart),
+  { ssr: false, loading: () => <div className="h-[200px] animate-pulse rounded-xl bg-muted" /> },
+);
+const TripsPerDayChart = dynamic(
+  () => import('@/features/admin/dashboard-charts').then((m) => m.TripsPerDayChart),
+  { ssr: false, loading: () => <Skeleton className="h-64 w-full rounded-xl" /> },
+);
+const AttendanceTrendChart = dynamic(
+  () => import('@/features/admin/dashboard-charts').then((m) => m.AttendanceTrendChart),
+  { ssr: false, loading: () => <Skeleton className="h-64 w-full rounded-xl" /> },
+);
 
 /* ------------------------------- types ------------------------------- */
 
@@ -91,11 +91,6 @@ type RouteDetail = {
 
 type MapStop = { id: string; name: string; sequence?: number; location: { coordinates: [number, number] } };
 
-const FLEET_COLORS: Record<string, string> = {
-  active: '#10b981',
-  inactive: '#64748b',
-  maintenance: '#f59e0b',
-};
 
 const FALLBACK_CENTER = { lat: 30.2672, lng: -97.7431 };
 
@@ -333,37 +328,7 @@ export function AdminDashboardClient() {
                 ) : fleetTotal === 0 ? (
                   <EmptyState title="No buses yet" body="Add buses to see fleet health." icon={Bus} />
                 ) : (
-                  <>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <PieChart>
-                        <Pie
-                          data={analytics.fleetStatus}
-                          dataKey="count"
-                          nameKey="status"
-                          innerRadius={50}
-                          outerRadius={80}
-                          paddingAngle={3}
-                          strokeWidth={0}
-                        >
-                          {analytics.fleetStatus.map((f) => (
-                            <Cell key={f.status} fill={FLEET_COLORS[f.status] ?? '#64748b'} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
-                      {analytics.fleetStatus.map((f) => (
-                        <span key={f.status} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <span
-                            className="h-2.5 w-2.5 rounded-full"
-                            style={{ backgroundColor: FLEET_COLORS[f.status] ?? '#64748b' }}
-                          />
-                          {f.status} <span className="font-bold text-foreground">{f.count}</span>
-                        </span>
-                      ))}
-                    </div>
-                  </>
+                  <FleetStatusChart data={analytics.fleetStatus} />
                 )}
               </CardContent>
             </Card>
@@ -382,15 +347,7 @@ export function AdminDashboardClient() {
                 ) : !analytics ? (
                   <div className="h-64 animate-pulse rounded-xl bg-muted" aria-label="Loading trips chart" />
                 ) : (
-                  <ResponsiveContainer width="100%" height={256}>
-                    <BarChart data={analytics.tripsPerDay} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(100,116,139,0.25)" />
-                      <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
-                      <YAxis allowDecimals={false} tickLine={false} axisLine={false} fontSize={12} width={36} />
-                      <Tooltip cursor={{ fill: 'rgba(25,118,210,0.08)' }} />
-                      <Bar dataKey="trips" name="Trips" fill="#1976d2" radius={[6, 6, 0, 0]} maxBarSize={36} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <TripsPerDayChart data={analytics.tripsPerDay} />
                 )}
               </CardContent>
             </Card>
@@ -406,23 +363,7 @@ export function AdminDashboardClient() {
                 ) : !analytics ? (
                   <div className="h-64 animate-pulse rounded-xl bg-muted" aria-label="Loading attendance chart" />
                 ) : (
-                  <ResponsiveContainer width="100%" height={256}>
-                    <LineChart data={analytics.attendanceTrend} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(100,116,139,0.25)" />
-                      <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
-                      <YAxis domain={[0, 100]} tickLine={false} axisLine={false} fontSize={12} width={36} />
-                      <Tooltip />
-                      <Line
-                        type="monotone"
-                        dataKey="rate"
-                        name="Present %"
-                        stroke="#10b981"
-                        strokeWidth={2.5}
-                        dot={{ r: 3, fill: '#10b981' }}
-                        activeDot={{ r: 5 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <AttendanceTrendChart data={analytics.attendanceTrend} />
                 )}
               </CardContent>
             </Card>
