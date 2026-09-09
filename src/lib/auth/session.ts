@@ -64,7 +64,7 @@ export function applySessionCookies(
   s: AppSession | null | undefined,
   secure: boolean,
 ) {
-  // Embedded mode (AUTH_COOKIE_EMBEDDED=1): cross-site iframe hosts drop
+  // Embedded mode (default; opt out with AUTH_COOKIE_EMBEDDED=0): cross-site iframe hosts drop
   // SameSite=Lax/Strict Set-Cookie, so use CHIPS (None + Secure + Partitioned).
   // Secure is mandatory for SameSite=None; allowed on http only for localhost.
   const base = EMBEDDED_COOKIES

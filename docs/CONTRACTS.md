@@ -14,16 +14,19 @@ The BFF keeps tokens out of the browser with HttpOnly cookies (set on login/regi
 claim/refresh): `sb_at` (access, path `/`), `sb_rt` (refresh, path `/api`, 7d),
 `sb_session` (unsigned role/id mirror for UX redirects only, 7d).
 
-Two modes, selected by `AUTH_COOKIE_EMBEDDED=1`:
+Two modes, selected by `AUTH_COOKIE_EMBEDDED` — **embedded is the default** (this
+deployment runs inside the sandbox's cross-site preview iframe, and the sandbox has
+been observed regenerating `.env`, which once silently reverted the flag and re-broke
+login). Opt out with `AUTH_COOKIE_EMBEDDED=0`:
 
-- **first-party (default)**: `SameSite=Lax` (`sb_rt`: `SameSite=Strict`), `Secure` when
-  the app URL is https. Use for same-origin deployments.
-- **embedded** (sandbox/preview panel hosts the app in a cross-site iframe): browsers
-  drop Lax/Strict cookies in third-party contexts — login would return 200 yet never
-  stick. In this mode all three cookies are issued as CHIPS:
+- **embedded (default)** (sandbox/preview panel hosts the app in a cross-site iframe):
+  browsers drop Lax/Strict cookies in third-party contexts — login would return 200
+  yet never stick. In this mode all three cookies are issued as CHIPS:
   `SameSite=None; Secure; Partitioned` (allowed in cross-site iframes, partitioned per
   top-level site; behaves like a normal cookie top-level). Requires a trustworthy
   context (HTTPS or http://localhost).
+- **first-party** (`AUTH_COOKIE_EMBEDDED=0`): `SameSite=Lax` (`sb_rt`: `SameSite=Strict`),
+  `Secure` when the app URL is https. Use for classic same-origin deployments.
 
 ## 0. Envelopes & pagination — V
 

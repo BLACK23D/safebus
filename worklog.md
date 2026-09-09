@@ -356,3 +356,20 @@ Work Log:
 
 Stage Summary:
 - QA engagement complete: findings report (docs/QA-FINDINGS.md), all blockers + majors + minors (excl. deliberate #19/#28) fixed and verified (docs/QA-CHANGES.md is the change record). App state: demo seed pristine, dev + backend healthy on :3000/:5000. Remaining known items: #19 border-contrast product decision; sandbox-only ops caveat.
+
+---
+Task ID: 9.3
+Agent: orchestrator (main)
+Task: Fix user-reported "signs in then bounces back to the login page" — regression of the Task 9.2 CHIPS fix caused by sandbox .env regeneration.
+
+Work Log:
+- Diagnosed from dev.log: user's attempts showed POST /api/auth/login → 200 immediately followed by GET /api/routes|trips|notifications → 401 and GET /login?reason=signin — the identical cookie-drop signature fixed in 9.2.
+- Root cause: the sandbox had regenerated .env to its template (only DATABASE_URL), wiping AUTH_COOKIE_EMBEDDED=1. Code fix was intact but EMBEDDED_COOKIES evaluated false, so cookies were re-issued as Lax/Strict and dropped by the cross-site preview iframe (origin preview-chat-*.space-z.ai visible in dev.log warning).
+- Resilience fix (src/lib/env.ts): flipped the default — EMBEDDED_COOKIES is now `process.env.AUTH_COOKIE_EMBEDDED !== '0'`, i.e. embedded/CHIPS mode is ON by default and .env regeneration can never silently re-break login; classic first-party deployments opt out explicitly with =0. Re-added AUTH_COOKIE_EMBEDDED=1 to .env (belt and braces), updated session.ts comment and docs/CONTRACTS.md §0.b to the new default.
+- Restarted Next dev with the orphaned-subshell pattern (prior evidence copied to dev.log.prev); curl through gateway :81 confirmed Set-Cookie `Secure; HttpOnly; SameSite=none; Partitioned` on sb_at/sb_rt/sb_session.
+- Browser-verified both contexts (agent-browser, single session fixverify, closed after): (a) cross-site iframe wrapper (localhost:9999 ⊃ 127.0.0.1:81) — parent demo login lands on /track with Live socket chip, child tabs, nav, zero JS errors; (b) top-level 127.0.0.1:81 — login lands on /track, zero errors. dev.log golden trail: login 200 → socket-token/routes/trips/unread-count all 200, no bounce.
+- Data: backend DB still held only the 8 demo users (user's own account deniskelvin23@outloook.com had been wiped by the QA-VERIFY reseed) and trips were dated Sep 2 ("No trip scheduled for today" on Sep 9). Killed both duplicate backend processes, deleted data.db*, restarted one instance with the orphan pattern; fresh seed verified in-browser: "Scheduled — Morning pickup — B-101 07:15–08:00" + Live + notifications badge 2.
+- Cleanup: removed iframe wrapper + :9999 server; closed browser session.
+
+Stage Summary:
+- Login works in both iframe and top-level contexts and is now regression-proof against .env resets (code-level default). NOTE for user: their self-registered account was destroyed by the earlier demo reseed and cannot be restored (password unknown) — they should re-register (auto-verifies in sandbox) or use the demo accounts. Dev + backend healthy on :3000/:5000 with today's seed.
