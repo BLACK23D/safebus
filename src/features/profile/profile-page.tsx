@@ -354,7 +354,7 @@ function ChildrenPanel({ onChanged }: { onChanged: () => void }) {
                   <p className="truncate font-semibold">{s.name}</p>
                   <p className="text-xs text-muted-foreground">{s.grade ? `Grade ${s.grade}` : 'Grade not set'}</p>
                 </div>
-                <Button variant="outline" size="sm" className="min-h-10" onClick={() => setDialogFor(s)}>
+                <Button variant="outline" size="sm" className="min-h-11" onClick={() => setDialogFor(s)}>
                   <PencilLine className="h-4 w-4" /> Request edit
                 </Button>
               </li>

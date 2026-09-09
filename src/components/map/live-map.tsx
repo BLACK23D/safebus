@@ -285,7 +285,7 @@ export function LiveMap({
 
   return (
     <div
-      role="application"
+      role="img"
       aria-label={ariaLabel ?? 'Live bus map'}
       className={cn(
         'relative w-full overflow-hidden rounded-2xl border bg-card',

@@ -517,7 +517,7 @@ export function TrackingClient({
                     No stops on this route.
                   </p>
                 ) : (
-                  <ol className="space-y-0">
+                  <ol className="max-h-96 space-y-0 overflow-y-auto pr-1 scrollbar-thin">
                     {stops.map((s, i) => {
                       const at = arrived[s.id];
                       const isNext = trip?.status === 'active' && s.id === nextStopId;

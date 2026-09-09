@@ -11,7 +11,6 @@ import {
   Moon,
   Settings,
   Sun,
-  Wifi,
   WifiOff,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -247,12 +246,12 @@ export function AppShell({ session, children }: { session: AppSession; children:
         </DropdownMenu>
       </header>
 
-      {/* Offline ribbon */}
+      {/* Offline ribbon — stacks BELOW the mobile top bar (z-30 < z-40) instead of
+          covering the bell/account menu (#18). */}
       {!online && (
-        <div className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-amber-500 py-1.5 text-xs font-semibold text-amber-950 lg:top-0">
+        <div className="sticky top-14 z-30 flex items-center justify-center gap-2 bg-amber-500 py-1.5 text-xs font-semibold text-amber-950 lg:top-0">
           <WifiOff className="h-3.5 w-3.5" />
           You are offline — live tracking and safety actions need a connection.
-          <Wifi className="h-3.5 w-3.5 opacity-0" aria-hidden />
         </div>
       )}
 

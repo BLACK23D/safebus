@@ -153,10 +153,10 @@ export default function EditRequestsPage() {
 
       <Tabs value={status} onValueChange={setStatus}>
         <TabsList className="h-11">
-          <TabsTrigger value="pending" className="min-h-9">Pending</TabsTrigger>
-          <TabsTrigger value="approved" className="min-h-9">Approved</TabsTrigger>
-          <TabsTrigger value="rejected" className="min-h-9">Rejected</TabsTrigger>
-          <TabsTrigger value="all" className="min-h-9">All</TabsTrigger>
+          <TabsTrigger value="pending" className="min-h-11">Pending</TabsTrigger>
+          <TabsTrigger value="approved" className="min-h-11">Approved</TabsTrigger>
+          <TabsTrigger value="rejected" className="min-h-11">Rejected</TabsTrigger>
+          <TabsTrigger value="all" className="min-h-11">All</TabsTrigger>
         </TabsList>
       </Tabs>
 

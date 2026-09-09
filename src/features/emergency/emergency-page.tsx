@@ -346,7 +346,7 @@ function ResolveDialog({
       <Button
         variant={resolve ? 'default' : 'outline'}
         onClick={() => setOpen(true)}
-        className={cn('min-h-10 flex-1', resolve ? 'bg-emerald-700 hover:bg-emerald-800' : undefined)}
+        className={cn('min-h-11 flex-1', resolve ? 'bg-emerald-700 hover:bg-emerald-800' : undefined)}
       >
         <CheckCircle2 className="h-4 w-4" /> {resolve ? 'Resolve' : 'Cancel alert'}
       </Button>
@@ -362,9 +362,9 @@ function ResolveDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className="min-h-10">Keep open</AlertDialogCancel>
+          <AlertDialogCancel className="min-h-11">Keep open</AlertDialogCancel>
           <AlertDialogAction
-            className={cn('min-h-10', resolve ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-slate-600 hover:bg-slate-700')}
+            className={cn('min-h-11', resolve ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-slate-600 hover:bg-slate-700')}
             disabled={busy}
             onClick={async (ev) => {
               ev.preventDefault();

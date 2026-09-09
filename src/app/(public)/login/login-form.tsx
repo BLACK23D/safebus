@@ -25,13 +25,18 @@ const ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin', icon: LayoutDashboard },
 ] as const;
 
-/** Sandbox convenience — seeded demo credentials (see worklog). Visually muted. */
-const DEMO_ACCOUNTS: { pickerRole: Role; label: string; email: string; password: string }[] = [
-  { pickerRole: 'parent', label: 'Parent', email: 'maria.demo@safebus.app', password: 'Parent123!' },
-  { pickerRole: 'driver', label: 'Driver', email: 'david.demo@safebus.app', password: 'Driver123!' },
-  { pickerRole: 'admin', label: 'School Admin', email: 'admin.demo@safebus.app', password: 'Admin123!' },
-  { pickerRole: 'admin', label: 'Super Admin', email: 'super.demo@safebus.app', password: 'Super123!' },
-];
+/** Sandbox convenience — seeded demo credentials (see worklog). Visually muted.
+ * Gated behind NEXT_PUBLIC_DEMO_MODE=1 so production bundles carry NO credentials
+ * (issue #3). The sandbox preview sets the flag in .env. */
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === '1';
+const DEMO_ACCOUNTS: { pickerRole: Role; label: string; email: string; password: string }[] = DEMO_MODE
+  ? [
+      { pickerRole: 'parent', label: 'Parent', email: 'maria.demo@safebus.app', password: 'Parent123!' },
+      { pickerRole: 'driver', label: 'Driver', email: 'david.demo@safebus.app', password: 'Driver123!' },
+      { pickerRole: 'admin', label: 'School Admin', email: 'admin.demo@safebus.app', password: 'Admin123!' },
+      { pickerRole: 'admin', label: 'Super Admin', email: 'super.demo@safebus.app', password: 'Super123!' },
+    ]
+  : [];
 
 /** Only same-origin relative paths may be used as a post-login target. */
 function safeNext(next: string | null): string | null {
@@ -153,11 +158,12 @@ export function LoginForm() {
         </Button>
       </form>
 
-      {/* Sandbox convenience — muted, collapsible demo credentials. */}
+      {/* Sandbox convenience — muted, collapsible demo credentials (demo mode only). */}
+      {DEMO_ACCOUNTS.length > 0 && (
       <Collapsible open={demoOpen} onOpenChange={setDemoOpen} className="mt-5">
         <CollapsibleTrigger
           className={cn(
-            'flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg text-xs text-muted-foreground',
+            'flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg text-xs text-muted-foreground',
             'transition-colors hover:text-foreground',
           )}
         >
@@ -191,6 +197,7 @@ export function LoginForm() {
           </div>
         </CollapsibleContent>
       </Collapsible>
+      )}
 
       <div className="mt-6">
         <AuthLinks
