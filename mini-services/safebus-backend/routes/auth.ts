@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import jwt from 'jsonwebtoken'
 import { one, run } from '../lib/db'
 import { ApiError, checkPassword, newId, nowIso, vd, verr, h } from '../lib/util'
 import {
@@ -7,6 +8,7 @@ import {
   comparePassword,
   dummyPasswordHash,
   hashPassword,
+  JWT_SECRET,
   rateLimit,
   requireAuth,
   type Row,
@@ -249,6 +251,21 @@ r.post(
     )
     const fresh = one('SELECT * FROM users WHERE id = ?', user.id)!
     res.json({ success: true, data: { ...authTokens(fresh), user: pubUser(fresh) } })
+  }),
+)
+
+// GET /auth/socket-token — 60-second socket-scoped JWT for the Socket.IO handshake.
+// Deliberately NOT a general API credential: requireAuth rejects scope:'socket'.
+r.get(
+  '/socket-token',
+  requireAuth,
+  h((req, res) => {
+    const token = jwt.sign(
+      { sub: req.user.id, role: req.user.role, scope: 'socket' },
+      JWT_SECRET,
+      { expiresIn: '60s' } as jwt.SignOptions,
+    )
+    res.json({ success: true, data: { token, expiresIn: 60 } })
   }),
 )
 

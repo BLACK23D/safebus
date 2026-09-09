@@ -36,6 +36,7 @@ export async function serverApi<T>(path: string, q?: Record<string, unknown>): P
     res = await fetch(`${BACKEND_URL}/api${path}${search}`, {
       headers: { authorization: `Bearer ${at ?? ''}`, accept: 'application/json' },
       cache: 'no-store',
+      signal: AbortSignal.timeout(10_000),
     });
   } catch {
     throw new ServerFetchError('Backend unreachable — please try again shortly.');

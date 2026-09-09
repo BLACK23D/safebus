@@ -131,7 +131,9 @@ CREATE TABLE IF NOT EXISTS attendance (
   failedAttempts INTEGER NOT NULL DEFAULT 0,
   lockedUntil TEXT,
   createdAt TEXT NOT NULL,
-  updatedAt TEXT NOT NULL
+  updatedAt TEXT NOT NULL,
+  code TEXT,
+  codeIssuedAt TEXT
 );
 CREATE TABLE IF NOT EXISTS messages (
   id TEXT PRIMARY KEY,
@@ -198,13 +200,71 @@ export function initDb(): Database {
   db = new Database(DB_PATH)
   db.exec('PRAGMA journal_mode = WAL;')
   db.exec(SCHEMA)
-  // Migration for databases created before the usedAt column existed (refresh reuse detection).
-  try {
-    db.exec('ALTER TABLE refresh_tokens ADD COLUMN usedAt TEXT')
-  } catch {
-    /* column already exists */
+  // Migrations for databases created before these columns existed.
+  for (const stmt of [
+    'ALTER TABLE refresh_tokens ADD COLUMN usedAt TEXT',
+    'ALTER TABLE attendance ADD COLUMN code TEXT',
+    'ALTER TABLE attendance ADD COLUMN codeIssuedAt TEXT',
+  ]) {
+    try {
+      db.exec(stmt)
+    } catch {
+      /* column already exists */
+    }
   }
+  ensureIndexes()
   return db
+}
+
+/** Hot foreign-key indexes — every list/dashboard query filters on these. */
+function ensureIndexes(): void {
+  if (!db) return
+  const idx = [
+    'CREATE INDEX IF NOT EXISTS idx_trips_driver ON trips(driverId)',
+    'CREATE INDEX IF NOT EXISTS idx_trips_school ON trips(schoolId)',
+    'CREATE INDEX IF NOT EXISTS idx_trips_route ON trips(routeId)',
+    'CREATE INDEX IF NOT EXISTS idx_attendance_trip ON attendance(tripId)',
+    'CREATE INDEX IF NOT EXISTS idx_attendance_student ON attendance(studentId)',
+    'CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(userId)',
+    'CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(senderId)',
+    'CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipientId)',
+    'CREATE INDEX IF NOT EXISTS idx_locations_trip ON locations(tripId)',
+    'CREATE INDEX IF NOT EXISTS idx_locations_at ON locations(at)',
+    'CREATE INDEX IF NOT EXISTS idx_students_parent ON students(parentId)',
+    'CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(userId)',
+  ]
+  for (const s of idx) {
+    try {
+      db.exec(s)
+    } catch (e) {
+      console.error('[db] index creation failed:', s, e)
+    }
+  }
+}
+
+/** GPS ping retention — bounds the only unbounded table. Runs at boot + every 6h. */
+export const LOCATION_RETENTION_DAYS = 7
+export function purgeOldLocations(days = LOCATION_RETENTION_DAYS): number {
+  if (!db) return 0
+  const cutoff = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString()
+  const before = count('SELECT COUNT(*) AS c FROM locations WHERE at < ?', cutoff)
+  if (before > 0) run('DELETE FROM locations WHERE at < ?', cutoff)
+  return before
+}
+
+/** Checkpoint the WAL and close cleanly (used by graceful shutdown). */
+export function closeDb(): void {
+  if (!db) return
+  try {
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE);')
+  } catch (e) {
+    console.error('[db] wal_checkpoint failed:', e)
+  }
+  try {
+    db.close()
+  } finally {
+    db = undefined as unknown as Database
+  }
 }
 
 export function q<T = Record<string, any>>(sql: string, ...params: unknown[]): T[] {

@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { count, one, q, run } from '../lib/db'
 import {
   ApiError,
+  code6,
   h,
   localDateStr,
   newId,
@@ -106,6 +107,9 @@ r.get(
   h((req, res) => {
     const me = req.user
     let rows: Row[] = []
+    // Row cap bounds memory for large histories; date filtering stays in-memory
+    // because trip dates are local-timezone derived (SQL date() would be UTC).
+    const ROW_CAP = 5000
     if (me.role === 'parent') {
       // trips touching linked children: route match OR attendance match
       const kids = q('SELECT id, routeId FROM students WHERE parentId = ?', me.id)
@@ -127,13 +131,13 @@ r.get(
       if (!ors.length) {
         return res.json({ success: true, data: { items: [], total: 0, page: 1, pages: 0 } })
       }
-      rows = q(`SELECT * FROM trips WHERE (${ors.join(' OR ')})`, ...params)
+      rows = q(`SELECT * FROM trips WHERE (${ors.join(' OR ')}) LIMIT ${ROW_CAP}`, ...params)
     } else if (me.role === 'driver') {
-      rows = q('SELECT * FROM trips WHERE driverId = ?', me.id)
+      rows = q('SELECT * FROM trips WHERE driverId = ? LIMIT ?', me.id, ROW_CAP)
     } else if (me.role === 'admin') {
-      rows = q('SELECT * FROM trips WHERE schoolId = ?', me.schoolId)
+      rows = q('SELECT * FROM trips WHERE schoolId = ? LIMIT ?', me.schoolId, ROW_CAP)
     } else {
-      rows = q('SELECT * FROM trips')
+      rows = q('SELECT * FROM trips LIMIT ?', ROW_CAP)
     }
 
     let filtered = rows
@@ -282,8 +286,8 @@ r.post(
       const exists = one('SELECT id FROM attendance WHERE tripId = ? AND studentId = ?', trip.id, s.id)
       if (exists) continue
       run(
-        `INSERT INTO attendance (id, tripId, studentId, stopId, date, type, status, verified, verifiedAt, failedAttempts, lockedUntil, createdAt, updatedAt)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO attendance (id, tripId, studentId, stopId, date, type, status, verified, verifiedAt, failedAttempts, lockedUntil, createdAt, updatedAt, code, codeIssuedAt)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         newId(),
         trip.id,
         s.id,
@@ -297,6 +301,8 @@ r.post(
         null,
         now,
         now,
+        code6(),
+        null,
       )
     }
     emitTripStatus(trip, 'active', { startedAt: now })

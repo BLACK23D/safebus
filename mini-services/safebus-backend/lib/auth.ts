@@ -78,6 +78,11 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     } catch {
       throw new ApiError(401, 'Unauthorized', 'UNAUTHORIZED')
     }
+    // Socket-scoped tokens (60s, scope:'socket') are for the Socket.IO handshake
+    // ONLY — they must never authenticate a REST call.
+    if (payload?.scope && payload.scope !== 'api') {
+      throw new ApiError(401, 'Unauthorized', 'UNAUTHORIZED')
+    }
     const user = one('SELECT * FROM users WHERE id = ?', payload?.sub)
     if (!user) throw new ApiError(401, 'Unauthorized', 'UNAUTHORIZED')
     if (user.status === 'inactive' || user.status === 'suspended') {

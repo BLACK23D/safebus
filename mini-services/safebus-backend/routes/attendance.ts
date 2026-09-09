@@ -119,7 +119,9 @@ r.get(
 
 /* --------------------------- code reveal --------------------------- */
 
-// GET /attendance/:id/code — parent of that student only
+// GET /attendance/:id/code — parent of that student only.
+// The verification code is generated per trip at trip:start (rotating codes);
+// each reveal refreshes the sliding expiry window that verify enforces.
 r.get(
   '/:id/code',
   h((req, res) => {
@@ -130,7 +132,15 @@ r.get(
     if (me.role !== 'parent' || !student || student.parentId !== me.id) {
       throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
     }
-    const code = a.type === 'pickup' ? student.pickupCode : student.dropoffCode
+    let code = a.code
+    if (!code) {
+      // Legacy row created before per-trip codes: fall back to the static student
+      // code and adopt it so verify/TTL behave consistently from now on.
+      code = a.type === 'pickup' ? student.pickupCode : student.dropoffCode
+      run('UPDATE attendance SET code = ? WHERE id = ?', code, a.id)
+    }
+    const issuedAt = new Date().toISOString()
+    run('UPDATE attendance SET codeIssuedAt = ? WHERE id = ?', issuedAt, a.id)
     res.json({
       success: true,
       data: { code, type: a.type, until: new Date(Date.now() + CODE_TTL_SECONDS * 1000).toISOString() },
@@ -163,8 +173,22 @@ r.post(
     }
 
     const student = studentOf(a)
-    const expected = student ? (a.type === 'pickup' ? student.pickupCode : student.dropoffCode) : null
+    const expected = a.code ?? (student ? (a.type === 'pickup' ? student.pickupCode : student.dropoffCode) : null)
     const alreadyDone = a.status === 'picked_up' || a.status === 'dropped_off'
+
+    // Verification mutates attendance only on an active trip (409 otherwise),
+    // except for the idempotent re-verify of an already-verified child.
+    if (trip.status !== 'active' && !(alreadyDone && a.verified)) {
+      throw new ApiError(409, `Trip is ${trip.status} — verification is closed`, 'INVALID_STATE')
+    }
+
+    // Reveal window enforced server-side (sliding: refreshed on each /code reveal).
+    if (!alreadyDone && a.codeIssuedAt) {
+      const ageSec = (Date.now() - new Date(a.codeIssuedAt).getTime()) / 1000
+      if (ageSec > CODE_TTL_SECONDS) {
+        throw new ApiError(400, 'Verification code expired — ask the parent to reveal it again', 'CODE_EXPIRED')
+      }
+    }
 
     if (String(code).trim() !== expected) {
       const attempts = Number(a.failedAttempts || 0) + 1
