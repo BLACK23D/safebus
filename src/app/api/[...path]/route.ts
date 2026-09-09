@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { BACKEND_URL, IS_SECURE } from '@/lib/env';
+import { BACKEND_URL, requestIsSecure } from '@/lib/env';
 import {
   applySessionCookies,
   clearSessionCookies,
@@ -53,12 +53,20 @@ function sameOrigin(req: NextRequest): boolean {
 
 type RefreshResult = { tokens: ReturnType<typeof extractTokens>; user: unknown } | null;
 
-/** Single-flight refresh per server process (rotation-race mitigation). */
-let inflight: Promise<RefreshResult> | null = null;
+/**
+ * Single-flight refresh, keyed by refresh token (issue #2). The map — not a single
+ * global promise — guarantees a caller can only ever receive the rotated session
+ * for the refresh token IT presented; a concurrent refresh for another user can
+ * no longer leak its tokens across accounts. Every refresh path in this module
+ * (401-retry, explicit auth/refresh POSTs, logout body injection) funnels through
+ * here so concurrent callers with the same token share one rotation.
+ */
+const inflight = new Map<string, Promise<RefreshResult>>();
 
 function refreshOnce(refreshToken: string): Promise<RefreshResult> {
-  if (inflight) return inflight;
-  inflight = (async (): Promise<RefreshResult> => {
+  const existing = inflight.get(refreshToken);
+  if (existing) return existing;
+  const promise = (async (): Promise<RefreshResult> => {
     try {
       const r = await fetch(`${BACKEND_URL}/api/auth/refresh`, {
         method: 'POST',
@@ -77,10 +85,11 @@ function refreshOnce(refreshToken: string): Promise<RefreshResult> {
     }
   })().finally(() => {
     setTimeout(() => {
-      inflight = null;
+      inflight.delete(refreshToken);
     }, 0);
   });
-  return inflight;
+  inflight.set(refreshToken, promise);
+  return promise;
 }
 
 async function forward(
@@ -123,10 +132,45 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path?: string[]
   }
 
   let at = req.cookies.get('sb_at')?.value;
+
+  const secure = requestIsSecure(req.headers);
+
+  // Explicit refresh POSTs are intercepted and funneled through the keyed
+  // single-flight so every refresh path (client retry, page shell, middleware)
+  // shares one rotation per refresh token. Response bodies stay token-stripped;
+  // the browser receives the new session exclusively via HttpOnly cookies.
+  if (joined === 'auth/refresh' && req.method === 'POST') {
+    const rt = req.cookies.get('sb_rt')?.value ?? bodyRefreshToken(body);
+    if (!rt) {
+      return NextResponse.json(
+        { success: false, message: 'Refresh token required', error: { code: 'UNAUTHORIZED' } },
+        { status: 401 },
+      );
+    }
+    const refreshed = await refreshOnce(rt);
+    if (!refreshed?.tokens) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid refresh token', error: { code: 'UNAUTHORIZED' } },
+        { status: 401 },
+      );
+    }
+    const json = { success: true, data: { ...refreshed.tokens, user: refreshed.user } };
+    const res = NextResponse.json(stripTokens(json), { status: 200 });
+    applySessionCookies(res, refreshed.tokens, sessionFromUser(refreshed.user) ?? session, secure);
+    return res;
+  }
+
+  // Logout: inject the refresh token from its cookie so the backend can actually
+  // revoke it server-side (previously the BFF forwarded no sb_rt → no-op revoke).
+  if (joined === 'auth/logout' && req.method === 'POST') {
+    const rt = req.cookies.get('sb_rt')?.value;
+    if (rt) body = JSON.stringify({ refreshToken: rt });
+  }
+
   let upstream = await forward(req, joined, at, body);
 
   // Single retry through a refreshed token on 401 (never for the refresh call itself).
-  if (upstream.status === 401 && !/^auth\/refresh/.test(joined)) {
+  if (upstream.status === 401 && !/^auth\/(refresh|logout)/.test(joined)) {
     const rt = req.cookies.get('sb_rt')?.value;
     if (rt) {
       const refreshed = await refreshOnce(rt);
@@ -142,7 +186,7 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path?: string[]
             res,
             refreshed.tokens,
             sessionFromUser(refreshed.user) ?? session,
-            IS_SECURE,
+            secure,
           );
           return res;
         }
@@ -165,7 +209,7 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path?: string[]
       const user = (json as { data?: { user?: unknown } })?.data?.user;
       const newSession = sessionFromUser(user) ?? session;
       const res = NextResponse.json(stripTokens(json), { status: upstream.status });
-      if (tokens && newSession) applySessionCookies(res, tokens, newSession, IS_SECURE);
+      if (tokens && newSession) applySessionCookies(res, tokens, newSession, secure);
       return res;
     }
     return NextResponse.json(json, { status: upstream.status });
@@ -183,6 +227,17 @@ function passthroughHeaders(upstream: Response): Headers {
   if (ct) h.set('content-type', ct);
   h.set('cache-control', 'no-store');
   return h;
+}
+
+/** Reads refreshToken from a raw JSON body (explicit refresh POSTs that carry no sb_rt cookie). */
+function bodyRefreshToken(body: BodyInit | undefined): string | undefined {
+  if (typeof body !== 'string') return undefined;
+  try {
+    const rt = (JSON.parse(body) as { refreshToken?: unknown })?.refreshToken;
+    return typeof rt === 'string' && rt ? rt : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Removes accessToken/refreshToken/token from auth response bodies. */

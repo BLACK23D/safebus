@@ -22,9 +22,16 @@ import misc, { healthHandler } from './routes/misc'
 
 const PORT = 5000
 
+// CORS: default permissive for the sandbox (BFF + gateway hops); production must
+// pin ALLOWED_ORIGIN (comma-separated list) to the deployment origin(s).
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGIN?.split(',').map((s) => s.trim()).filter(Boolean)
+const corsOptions = ALLOWED_ORIGINS?.length
+  ? { origin: ALLOWED_ORIGINS, methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'] }
+  : {}
+
 export function createApp(): Express {
   const app = express()
-  app.use(cors())
+  app.use(cors(corsOptions))
   // capture raw body for multipart avatar handling; JSON bodies also keep rawBody
   app.use(
     express.json({
@@ -66,7 +73,9 @@ function main() {
   const app = createApp()
   const httpServer = createServer(app)
   const io = new SocketServer(httpServer, {
-    cors: { origin: '*', methods: ['GET', 'POST'] },
+    cors: ALLOWED_ORIGINS?.length
+      ? { origin: ALLOWED_ORIGINS, methods: ['GET', 'POST'] }
+      : { origin: '*', methods: ['GET', 'POST'] },
   })
   setIo(io)
   setupSocket(io)

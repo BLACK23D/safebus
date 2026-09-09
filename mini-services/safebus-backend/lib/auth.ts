@@ -4,14 +4,35 @@ import type { NextFunction, Request, Response } from 'express'
 import { one, run } from './db'
 import { ApiError, newId, nowIso, token48 } from './util'
 
-export const JWT_SECRET = 'safebus-dev-secret-9f2c1b7a5e84d0c3a6b1f8e2d4c7a9b0'
+const DEV_JWT_SECRET = 'safebus-dev-secret-9f2c1b7a5e84d0c3a6b1f8e2d4c7a9b0'
+const isProd = process.env.NODE_ENV === 'production'
+const configuredSecret = process.env.JWT_SECRET
+
+// Fail-fast: production must be configured with a real secret (>= 32 chars).
+if (isProd && (!configuredSecret || configuredSecret.length < 32)) {
+  throw new Error('[safebus-backend] JWT_SECRET env var must be set (>= 32 chars) in production')
+}
+
+export const JWT_SECRET =
+  configuredSecret && configuredSecret.length >= 32 ? configuredSecret : DEV_JWT_SECRET
+
+if (JWT_SECRET === DEV_JWT_SECRET) {
+  console.warn('[safebus-backend] WARNING: using built-in dev JWT secret — set JWT_SECRET before any real deployment')
+}
+
 export const ACCESS_TTL = '15m'
 export const REFRESH_DAYS = 7
 
 export type Row = Record<string, any>
 
-export const hashPassword = (pw: string): string => bcrypt.hashSync(pw, 10)
+export const hashPassword = (pw: string): string => bcrypt.hashSync(pw, 12)
 export const comparePassword = (pw: string, hash: string): boolean => bcrypt.compareSync(pw, hash)
+
+/** One-time lazily-computed hash used to equalize login timing for unknown emails. */
+let dummyHashCache: string | null = null
+export function dummyPasswordHash(): string {
+  return (dummyHashCache ??= bcrypt.hashSync('timing-equalizer-dummy-password', 12))
+}
 
 export function signAccess(user: Row): string {
   return jwt.sign(
@@ -81,12 +102,29 @@ export function requireRole(...roles: string[]) {
   }
 }
 
-/** Simple in-memory fixed-window rate limiter. */
-export function rateLimit(opts: { windowMs: number; max: number; bucket: string }) {
+/** Best-effort client IP: last X-Forwarded-For entry (appended by our own gateway),
+ * falling back to the socket address. Unlike `req.ip` with naive trust-proxy settings,
+ * the rightmost entry cannot be spoofed by the client when a trusted proxy appends. */
+export function clientIp(req: Request): string {
+  const xff = req.headers['x-forwarded-for']
+  if (typeof xff === 'string' && xff.trim()) {
+    const parts = xff.split(',').map((s) => s.trim()).filter(Boolean)
+    if (parts.length) return parts[parts.length - 1]
+  }
+  return (req as any).ip || req.socket?.remoteAddress || 'unknown'
+}
+
+/** Simple in-memory fixed-window rate limiter.
+ * Keys by `opts.key(req)` when provided (e.g. ip+account for login), otherwise client IP. */
+export function rateLimit(opts: {
+  windowMs: number
+  max: number
+  bucket: string
+  key?: (req: Request) => string
+}) {
   const hits = new Map<string, { count: number; resetAt: number }>()
   return (req: Request, res: Response, next: NextFunction) => {
-    const ip = (req as any).ip || req.socket?.remoteAddress || 'unknown'
-    const key = `${opts.bucket}:${ip}`
+    const key = `${opts.bucket}:${opts.key ? opts.key(req) : clientIp(req)}`
     const now = Date.now()
     let rec = hits.get(key)
     if (!rec || rec.resetAt <= now) {
