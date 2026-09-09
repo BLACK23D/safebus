@@ -1,5 +1,7 @@
 # Task 8 — pwa-layer — Work Record
 
+> **SUPERSEDED (2026-09):** this record describes Service Worker **v1 (cache-first)**, which was replaced by v2/v3 (network-first) after the stale-chunk incident — see worklog Task 9.4 and [ADR-0003](../adr/0003-sw-privacy-strategy.md).
+
 ## Deliverables (all verified on live dev server, port 3000)
 
 | File | Action | Notes |
@@ -20,7 +22,7 @@
 ## Service worker contract (for reviewers)
 
 - NEVER caches: `/api/*`, `/socket.io`, non-GET, Authorization/cookie-bearing requests, navigations (authenticated HTML). No Background Sync — safety writes never replayed.
-- Branch 1: `/â_next/static/` + `/icons/` → cache-first even with cookies. Branch 2: navigations + cookie GETs → network-only, fallback `caches.match('/offline')`. Branch 3: other public same-origin GETs → stale-while-revalidate (`manifest.webmanifest`, `logo.svg` land here — fine).
+- Branch 1: `/_next/static/` + `/icons/` → cache-first even with cookies. Branch 2: navigations + cookie GETs → network-only, fallback `caches.match('/offline')`. Branch 3: other public same-origin GETs → stale-while-revalidate (`manifest.webmanifest`, `logo.svg` land here — fine).
 - Install precaches `['/offline','/manifest.webmanifest','/icons/icon-192.png','/icons/icon-512.png']`; NO skipWaiting on install. New versions activate ONLY after the UI banner posts `SKIP_WAITING` (user consent). `controllerchange` → one reload (module flag `reloadedOnce`).
 
 ## Update UX (register-sw.tsx)

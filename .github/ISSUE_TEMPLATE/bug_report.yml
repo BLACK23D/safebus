@@ -1,0 +1,39 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: role
+    attributes:
+      label: Role
+      options: ["Parent", "Driver", "Admin", "Super admin", "Public/Logged out", "N/A"]
+    validations:
+      required: true
+  - type: input
+    id: route
+    attributes:
+      label: Route / page
+      placeholder: e.g. /track, /driver/trips/123, /login
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened vs what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Evidence
+      description: dev.log / backend-dev.log excerpt, console errors, or a screenshot
+  - type: dropdown
+    id: cookie-mode
+    attributes:
+      label: Cookie mode (AUTH_COOKIE_EMBEDDED)
+      options: ["1 (embedded/CHIPS — default)", "0 (first-party)", "unknown"]
+  - type: input
+    id: seed-state
+    attributes:
+      label: Backend seed state
+      placeholder: e.g. fresh seed, seeded 2026-09-09
